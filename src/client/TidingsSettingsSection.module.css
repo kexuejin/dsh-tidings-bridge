@@ -1,0 +1,231 @@
+/**
+ * 捎话 settings card — styling.
+ *
+ * ## 为什么每个颜色都走 --dsw-* 变量
+ *
+ * 本插件是 DSH 里的一页，它的颜色必须跟着 DSH 主题走（浅色 / 深色 / 自动），
+ * **不许写颜色字面量、也不许写 var() 回落值**。这不是风格偏好而是可判定纪律：
+ * 字面量在深色主题下必然读不清，而那种缺陷只在用户切主题时才显形。
+ * 官方设置页（ui-settings-account/AccountSection.module.css）用的是同一套 token。
+ *
+ * ## 为什么用 CSS Module
+ *
+ * 构建链（tsdown.config.ts）里 lightningcss 已接好，CSS Module 会被内联进 client
+ * bundle 并自动加 [hash]_[local] 前缀。全局类名会污染 DSH 的样式空间；内联样式
+ * 拿不到 :focus-visible 这类本卡片要用的东西。
+ *
+ * 类名与 TidingsSettingsSection.tsx 的 css 映射一一对应。
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 8px 0;
+  font-size: 13px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.lead {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* 一行「标签 —— 值/控件」。卡片里每一行都用它，间距才一致。 */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+}
+
+.rowLabel {
+  color: var(--dsw-alias-label-primary);
+}
+
+/*
+ * 补充说明（当前只出现在折叠区里，紧跟它上面那一行控件）。
+ *
+ * ## 为什么没有负边距（2026-10-14 修「高级设置里样式重叠」）
+ *
+ * 第一版带着 `margin: -8px 0 0` —— 那是为**主区**写的（主区 `.root` 有 `gap: 14px`，
+ * 负边距把说明拉近它的控件）。可这条类从没在主区用过，而折叠区当时的 `.field` 又自带
+ * `margin-top: 10px`，两者叠加 ⇒ 说明被拉进上一个输入框，真机表现为文字与控件重叠。
+ *
+ * 删掉负边距而不是加一条 `.details .rowHint { margin: 0 }` 覆盖：后者是两层规则互相抵消，
+ * 读的人要先确认哪层赢。现在间距只有一个来源 —— 容器（`.root` / `.details`）的 gap。
+ */
+.rowHint {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/*
+ * 连接状态：圆点 + 文案。三档各自一个类名（**静态**，不动态拼字符串）——
+ * 动态拼类名（`is-${tone}`）让 CSS 一致性门禁检查不到，而那正是本批第一版
+ * 「引用了 17 个不存在的类名」的同一种缺陷。
+ */
+.stateOk,
+.stateBad,
+.stateIdle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-idle-primary);
+  flex: none;
+}
+
+/* 已连接 —— 绿。 */
+.stateOk .dot {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+/* 未连接 —— 红。这是用户要动手的那一档，所以它最显眼。 */
+.stateBad {
+  color: var(--dsw-alias-state-error-primary);
+  font-weight: 600;
+}
+
+.stateBad .dot {
+  background: var(--dsw-alias-state-error-primary);
+}
+
+/* 检查中 —— 中性。 */
+.stateIdle .dot {
+  background: var(--dsw-alias-state-idle-primary);
+}
+
+/*
+ * 未连接时的引导卡：这一页最有价值的一块，所以给它卡片外框。
+ * 它必须包含**动作**（去哪拿桌面端），而不只是"请启动桌面端"这句空话 ——
+ * 一个用户手上没有的东西，让他"启动"等于没有出路。
+ */
+.hint {
+  margin: 0;
+  padding: 10px 12px;
+  border: 0.5px solid var(--dsw-alias-settings-card-stroke);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-settings-card-fill);
+  color: var(--dsw-alias-label-primary);
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.input {
+  width: 100%;
+  max-width: 320px;
+  padding: 4px 8px;
+  border: 0.5px solid var(--dsw-alias-settings-card-stroke);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-settings-card-fill);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--dsw-focus-ring-color);
+  outline-offset: 1px;
+}
+
+/*
+ * 折叠区。
+ *
+ * ## 为什么它必须是 flex 列 + gap（2026-10-14 修「高级设置里样式重叠」）
+ *
+ * 第一版不是容器：里面的 `.field` 各带 `margin-top: 10px`，而 `.rowHint` 带着
+ * `margin: -8px 0 0`（那条负边距是为**主区**写的 —— 主区 `.root` 有 `gap: 14px` 抵消它）。
+ * 两者在折叠区里叠加，hint 被拉进上一个 field 里 ⇒ 文字与输入框重叠。
+ *
+ * 改成与 `.root` 同一套：容器管间距，子元素不许带裸 margin。间距规则只留一处。
+ */
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 0.5px solid var(--dsw-alias-border-l);
+  padding-top: 10px;
+}
+
+.summary {
+  cursor: pointer;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  user-select: none;
+}
+
+.summary:focus-visible {
+  outline: 2px solid var(--dsw-focus-ring-color);
+  outline-offset: 2px;
+  border-radius: var(--dsw-radius-md);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  /* 不再自带 margin：间距由 .root / .details 的 gap 管（见 .details 的 KDoc）。 */
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 引导里的动作行：把「去哪拿桌面端」排成可点的入口。 */
+.guideActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* 外链用 <a>：它必须是真链接（可复制、可新开标签），不能做成 JS 跳转。 */
+.link {
+  color: var(--dsw-alias-button-primary-fill);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--dsw-focus-ring-color);
+  outline-offset: 2px;
+  border-radius: var(--dsw-radius-md);
+}
+
+/* 窄窗口下让行改为竖排：设置页在窄栏里会被压到 ~360px。 */
+@media (max-width: 480px) {
+  .row,
+  .field {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .input {
+    min-width: 0;
+    width: 100%;
+    max-width: none;
+  }
+}
