@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-platform="darwin">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dsh-tidings 面板 — 原型稿</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   0. 下面这一大段是 ui-theme 的 verbatim 拷贝，只为让这份稿子在真值上渲染。
+      来源（deepseek-harness 仓库）：
+        packages/client/ui-theme/src/styles/design-platform.css   ← 主要来源
+        packages/client/ui-theme/src/styles/base.css              ← 圆角 / 字体 / 缓动
+        packages/client/ui-theme/src/styles/focus.css             ← 焦点环
+      唯一改动：块里的 body 选择器改写成 .win —— 稿子要在一页里并排画多个
+      「窗口」，深浅两套必须按窗口切，不能挂在真 body 上。
+      真实实现里这些规则归 ui-theme / ui-primitives 所有，面板一行都不该自己写。
+      读这份稿子时这一段可以整段跳过。
+   ══════════════════════════════════════════════════════════════════════════ */
+/* ↓↓↓ 以下三段为 verbatim 拷贝，来源见文件头说明 ↓↓↓ */
+/* ── design-platform.css（token 表：静态色阶 + 语义别名（浅色在 .win，深色在 .win[data-ds-dark-theme]）） ── */
+/* Figma font-weight 510 (an SF Pro variable-font weight) always renders as
+   font-weight: 500 in this UI — non-variable webfonts snap intermediate
+   weights unpredictably across platforms. */
+.win {
+  --dsw-static-amber-100: rgb(254, 245, 231);
+  --dsw-static-amber-400: rgb(247, 173, 49);
+  --dsw-static-amber-500: rgb(245, 158, 11);
+  --dsw-static-amber-600: rgb(221, 134, 41);
+  --dsw-static-amber-900: rgb(39, 36, 31);
+  --dsw-static-blue-100: rgb(219, 234, 254);
+  --dsw-static-blue-300: rgb(147, 197, 253);
+  --dsw-static-blue-400: rgb(96, 165, 250);
+  --dsw-static-blue-450: rgb(77, 147, 248);
+  --dsw-static-blue-500: rgb(59, 130, 246);
+  --dsw-static-blue-50: rgb(239, 246, 255);
+  --dsw-static-blue-50p: rgb(234, 243, 255);
+  --dsw-static-blue-600: rgb(37, 99, 235);
+  --dsw-static-blue-75: rgb(229, 240, 255);
+  --dsw-static-blue-800: rgb(30, 64, 175);
+  --dsw-static-blue-900: rgb(14, 48, 116);
+  --dsw-static-blue-950: rgb(23, 37, 84);
+  --dsw-static-deepseek-100: rgb(228, 237, 253);
+  --dsw-static-deepseek-200: rgb(211, 226, 255);
+  --dsw-static-deepseek-300: rgb(183, 200, 254);
+  /* Brightened from the platform rgb(103, 158, 254) at the designer's request: legibility on the dark toast surface. */
+  --dsw-static-deepseek-400: rgb(122, 170, 255);
+  --dsw-static-deepseek-450: rgb(86, 134, 254);
+  --dsw-static-deepseek-500: rgb(65, 118, 230);
+  --dsw-static-deepseek-50: rgb(237, 243, 254);
+  --dsw-static-deepseek-600: rgb(72, 104, 178);
+  --dsw-static-deepseek-700-delete: rgb(47, 76, 143);
+  --dsw-static-deepseek-800: rgb(52, 65, 91);
+  --dsw-static-deepseek-900: rgb(40, 49, 66);
+  --dsw-static-green-100: rgb(230, 250, 237);
+  --dsw-static-green-400: rgb(78, 209, 126);
+  --dsw-static-green-500: rgb(34, 197, 94);
+  --dsw-static-green-500-a08: rgb(34 197 94 / 8%);
+  --dsw-static-green-500-a12: rgb(34 197 94 / 12%);
+  --dsw-static-green-900: rgb(35, 60, 44);
+  --dsw-static-neutral-00: rgb(255, 255, 255);
+  --dsw-static-neutral-1000: rgb(0, 0, 0);
+  --dsw-static-neutral-100: rgb(245, 245, 245);
+  --dsw-static-neutral-150: rgb(237, 237, 237);
+  --dsw-static-neutral-200: rgb(229, 229, 229);
+  --dsw-static-neutral-250: rgb(220, 220, 220);
+  --dsw-static-neutral-300: rgb(212, 212, 212);
+  --dsw-static-neutral-400: rgb(162, 164, 166);
+  --dsw-static-neutral-500: rgb(127, 130, 135);
+  --dsw-static-neutral-50: rgb(250, 250, 250);
+  --dsw-static-neutral-550: rgb(101, 103, 107);
+  --dsw-static-neutral-600: rgb(84, 85, 87);
+  --dsw-static-neutral-700: rgb(60, 60, 61);
+  --dsw-static-neutral-800: rgb(41, 41, 41);
+  --dsw-static-neutral-850: rgb(33, 33, 35);
+  --dsw-static-neutral-900: rgb(15, 15, 15);
+  --dsw-static-neutral-bluish-00: rgb(255, 255, 255);
+  --dsw-static-neutral-bluish-1000: rgb(15, 17, 21);
+  --dsw-static-neutral-bluish-100: rgb(235, 238, 242);
+  --dsw-static-neutral-bluish-150: rgb(233, 236, 242);
+  --dsw-static-neutral-bluish-200: rgb(225, 229, 238);
+  --dsw-static-neutral-bluish-300: rgb(207, 211, 214);
+  --dsw-static-neutral-bluish-400: rgb(173, 178, 184);
+  --dsw-static-neutral-bluish-500: rgb(151, 157, 166);
+  --dsw-static-neutral-bluish-50: rgb(249, 250, 251);
+  --dsw-static-neutral-bluish-600: rgb(129, 133, 140);
+  --dsw-static-neutral-bluish-60: rgb(245, 246, 247);
+  --dsw-static-neutral-bluish-700: rgb(97, 102, 107);
+  --dsw-static-neutral-bluish-750: rgb(67, 69, 74);
+  --dsw-static-neutral-bluish-75: rgb(241, 243, 245);
+  --dsw-static-neutral-bluish-800: rgb(53, 54, 56);
+  --dsw-static-neutral-bluish-850: rgb(44, 44, 46);
+  --dsw-static-neutral-bluish-875: rgb(35, 35, 36);
+  --dsw-static-neutral-bluish-900: rgb(27, 27, 28);
+  --dsw-static-neutral-bluish-950: rgb(21, 21, 23);
+  --dsw-static-red-100: rgb(254, 226, 226);
+  --dsw-static-red-400: rgb(242, 90, 90);
+  --dsw-static-red-400-a12: rgb(242 90 90 / 12%);
+  --dsw-static-red-500: rgb(239, 68, 68);
+  --dsw-static-red-50: rgb(254, 242, 242);
+  --dsw-static-red-600: rgb(236, 19, 19);
+  --dsw-static-red-600-a08: rgb(236 19 19 / 8%);
+  --dsw-static-red-900: rgb(87, 12, 12);
+}
+
+.win[data-ds-dark-theme] {
+  --dsw-static-amber-100: rgb(254, 245, 231);
+  --dsw-static-amber-400: rgb(247, 173, 49);
+  --dsw-static-amber-500: rgb(245, 158, 11);
+  --dsw-static-amber-600: rgb(221, 134, 41);
+  --dsw-static-amber-900: rgb(39, 36, 31);
+  --dsw-static-blue-100: rgb(219, 234, 254);
+  --dsw-static-blue-300: rgb(147, 197, 253);
+  --dsw-static-blue-400: rgb(96, 165, 250);
+  --dsw-static-blue-450: rgb(77, 147, 248);
+  --dsw-static-blue-500: rgb(59, 130, 246);
+  --dsw-static-blue-50: rgb(239, 246, 255);
+  --dsw-static-blue-50p: rgb(234, 243, 255);
+  --dsw-static-blue-600: rgb(37, 99, 235);
+  --dsw-static-blue-75: rgb(229, 240, 255);
+  --dsw-static-blue-800: rgb(30, 64, 175);
+  --dsw-static-blue-900: rgb(14, 48, 116);
+  --dsw-static-blue-950: rgb(23, 37, 84);
+  --dsw-static-deepseek-100: rgb(228, 237, 253);
+  --dsw-static-deepseek-200: rgb(211, 226, 255);
+  --dsw-static-deepseek-300: rgb(183, 200, 254);
+  /* Brightened from the platform rgb(103, 158, 254) at the designer's request: legibility on the dark toast surface. */
+  --dsw-static-deepseek-400: rgb(122, 170, 255);
+  --dsw-static-deepseek-450: rgb(86, 134, 254);
+  --dsw-static-deepseek-500: rgb(65, 118, 230);
+  --dsw-static-deepseek-50: rgb(237, 243, 254);
+  --dsw-static-deepseek-600: rgb(72, 104, 178);
+  --dsw-static-deepseek-700-delete: rgb(47, 76, 143);
+  --dsw-static-deepseek-800: rgb(52, 65, 91);
+  --dsw-static-deepseek-900: rgb(40, 49, 66);
+  --dsw-static-green-100: rgb(230, 250, 237);
+  --dsw-static-green-400: rgb(78, 209, 126);
+  --dsw-static-green-500: rgb(34, 197, 94);
+  --dsw-static-green-500-a08: rgb(34 197 94 / 8%);
+  --dsw-static-green-500-a12: rgb(34 197 94 / 12%);
+  --dsw-static-green-900: rgb(35, 60, 44);
+  --dsw-static-neutral-00: rgb(255, 255, 255);
+  --dsw-static-neutral-1000: rgb(0, 0, 0);
+  --dsw-static-neutral-100: rgb(245, 245, 245);
+  --dsw-static-neutral-150: rgb(237, 237, 237);
+  --dsw-static-neutral-200: rgb(229, 229, 229);
+  --dsw-static-neutral-250: rgb(220, 220, 220);
+  --dsw-static-neutral-300: rgb(212, 212, 212);
+  --dsw-static-neutral-400: rgb(162, 164, 166);
+  --dsw-static-neutral-500: rgb(127, 130, 135);
+  --dsw-static-neutral-50: rgb(250, 250, 250);
+  --dsw-static-neutral-550: rgb(101, 103, 107);
+  --dsw-static-neutral-600: rgb(84, 85, 87);
+  --dsw-static-neutral-700: rgb(60, 60, 61);
+  --dsw-static-neutral-800: rgb(41, 41, 41);
+  --dsw-static-neutral-850: rgb(33, 33, 35);
+  --dsw-static-neutral-900: rgb(15, 15, 15);
+  --dsw-static-neutral-bluish-00: rgb(255, 255, 255);
+  --dsw-static-neutral-bluish-1000: rgb(15, 17, 21);
+  --dsw-static-neutral-bluish-100: rgb(235, 238, 242);
+  --dsw-static-neutral-bluish-150: rgb(233, 236, 242);
+  --dsw-static-neutral-bluish-200: rgb(225, 229, 238);
+  --dsw-static-neutral-bluish-300: rgb(207, 211, 214);
+  --dsw-static-neutral-bluish-400: rgb(173, 178, 184);
+  --dsw-static-neutral-bluish-500: rgb(151, 157, 166);
+  --dsw-static-neutral-bluish-50: rgb(249, 250, 251);
+  --dsw-static-neutral-bluish-600: rgb(129, 133, 140);
+  --dsw-static-neutral-bluish-60: rgb(249, 250, 251);
+  --dsw-static-neutral-bluish-700: rgb(97, 102, 107);
+  --dsw-static-neutral-bluish-750: rgb(67, 69, 74);
+  --dsw-static-neutral-bluish-75: rgb(241, 243, 245);
+  --dsw-static-neutral-bluish-800: rgb(53, 54, 56);
+  --dsw-static-neutral-bluish-850: rgb(44, 44, 46);
+  --dsw-static-neutral-bluish-875: rgb(35, 35, 36);
+  --dsw-static-neutral-bluish-900: rgb(27, 27, 28);
+  --dsw-static-neutral-bluish-950: rgb(21, 21, 23);
+  --dsw-static-red-100: rgb(254, 226, 226);
+  --dsw-static-red-400: rgb(242, 90, 90);
+  --dsw-static-red-400-a12: rgb(242 90 90 / 12%);
+  --dsw-static-red-500: rgb(239, 68, 68);
+  --dsw-static-red-50: rgb(254, 242, 242);
+  --dsw-static-red-600: rgb(236, 19, 19);
+  --dsw-static-red-600-a08: rgb(236 19 19 / 8%);
+  --dsw-static-red-900: rgb(87, 12, 12);
+}
+
+.win {
+  --dsw-alias-bg-base: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-bg-document-preview: var(--dsw-static-neutral-bluish-100);
+  --dsw-alias-bg-document-selection: color-mix(in srgb, var(--dsw-static-blue-500) 40%, transparent);
+  --dsw-alias-label-document-preview: var(--dsw-static-neutral-bluish-700);
+  --dsw-alias-bg-layer-1: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-bg-layer-2: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-bg-layer-3: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-bg-mask-1: rgba(0, 0, 0, 0.24);
+  --dsw-alias-bg-mask-2: rgba(0, 0, 0, 0.12);
+  --dsw-alias-bg-mask-3: rgba(0, 0, 0, 0.48);
+  --dsw-alias-bg-mask-photo: rgba(0, 0, 0, 0.88);
+  --dsw-alias-bg-mask-drop: rgba(255, 255, 255, 0.7);
+  --dsw-alias-bg-module-platform: var(--dsw-static-neutral-bluish-60);
+  --dsw-alias-bg-multi-select: var(--dsw-static-neutral-bluish-60);
+  --dsw-alias-bg-overlay: var(--dsw-static-neutral-bluish-150);
+  --dsw-alias-bg-skeleton: rgba(0, 0, 0, 0.04);
+  --dsw-alias-border-inverted2: rgba(0, 0, 0, 0);
+  --dsw-alias-border-inverted: rgba(0, 0, 0, 0);
+  --dsw-alias-border-l1: rgba(0, 0, 0, 0.04);
+  --dsw-alias-border-l2-darkmode-thin: rgba(0, 0, 0, 0.1);
+  --dsw-alias-border-l2: rgba(0, 0, 0, 0.1);
+  --dsw-alias-border-l3: rgba(0, 0, 0, 0.12);
+  --dsw-alias-border-l4: rgba(0, 0, 0, 0.16);
+  --dsw-alias-brand-primary-invert: var(--dsw-static-neutral-bluish-1000);
+  --dsw-alias-brand-primary-new-colorprimary-new-color: rgb(65, 118, 230);
+  --dsw-alias-brand-primary: var(--dsw-static-neutral-bluish-1000);
+  --dsw-alias-brand-text: var(--dsw-static-neutral-bluish-1000);
+  --dsw-alias-button-contrast-fill: var(--dsw-static-neutral-bluish-700);
+  --dsw-alias-button-elevated-fill: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-button-floating-fill: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-button-floating-hover: var(--dsw-static-neutral-bluish-75);
+  --dsw-alias-button-ghost-active-border: var(--dsw-static-neutral-bluish-500);
+  --dsw-alias-button-ghost-active-fill: var(--dsw-static-neutral-bluish-100);
+  --dsw-alias-button-ghost-active-hover: var(--dsw-static-neutral-bluish-150);
+  --dsw-alias-button-info-fill: var(--dsw-static-deepseek-500);
+  --dsw-alias-button-info-hover: var(--dsw-static-deepseek-400);
+  --dsw-alias-button-primary-dimmed: var(--dsw-static-neutral-bluish-100);
+  --dsw-alias-button-primary-fill: var(--dsw-alias-brand-primary);
+  --dsw-alias-button-primary-hover: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-button-tool-bar-fill-invisible: rgba(31, 31, 31, 0.36);
+  --dsw-alias-button-tool-bar-fill: rgba(84, 85, 87, 0.5);
+  --dsw-alias-button-tool-bar-hover: rgba(84, 85, 87, 0.6);
+  --dsw-alias-interactive-bg-active: rgba(38, 49, 72, 0.1);
+  --dsw-alias-interactive-bg-hover-accent: rgba(38, 49, 72, 0.14);
+  --dsw-alias-interactive-bg-hover-danger: rgba(236, 19, 19, 0.05);
+  --dsw-alias-interactive-bg-hover-solid: var(--dsw-static-neutral-bluish-75);
+  --dsw-alias-interactive-bg-hover: rgba(38, 49, 72, 0.06);
+  --dsw-alias-label-caption: var(--dsw-static-neutral-bluish-400);
+  --dsw-alias-label-deep-diving: color-mix(in srgb, var(--dsw-static-deepseek-500) 70%, var(--dsw-static-blue-950));
+  --dsw-alias-label-deep-diving-shimmer: color-mix(in srgb, var(--dsw-static-deepseek-500) 30%, var(--dsw-static-blue-950));
+  --dsw-alias-label-dimmed: var(--dsw-static-neutral-bluish-200);
+  --dsw-alias-label-primary-bluish: var(--dsw-static-blue-900);
+  --dsw-alias-label-primary-dimmed: var(--dsw-static-neutral-bluish-950);
+  --dsw-alias-label-primary-foreground: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-label-primary-inverted: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-label-primary: var(--dsw-static-neutral-bluish-1000);
+  --dsw-alias-label-secondary: var(--dsw-static-neutral-bluish-700);
+  --dsw-alias-label-shimmer: color-mix(in srgb, var(--dsw-static-neutral-1000) 30%, transparent);
+  --dsw-alias-label-tertiary: var(--dsw-static-neutral-bluish-600);
+  --dsw-alias-menu-icon: var(--dsw-static-neutral-bluish-800);
+  --dsw-alias-link: var(--dsw-static-deepseek-500);
+  --dsw-alias-markdown-citation: var(--dsw-static-neutral-bluish-100);
+  --dsw-alias-markdown-code-block-banner: var(--dsw-static-neutral-bluish-50);
+  --dsw-alias-markdown-code-block: var(--dsw-static-neutral-bluish-50);
+  --dsw-alias-markdown-code-segment-selected: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-markdown-code-segment-unselected: var(--dsw-static-neutral-bluish-75);
+  --dsw-alias-markdown-inline-code: var(--dsw-static-neutral-50);
+  --dsw-alias-markdown-placeholder: var(--dsw-static-neutral-bluish-60);
+  --dsw-alias-markdown-tag: var(--dsw-static-neutral-bluish-75);
+  --dsw-alias-scrollbar-bg-l1: var(--dsw-static-neutral-200);
+  --dsw-alias-scrollbar-bg-l2: var(--dsw-static-neutral-200);
+  --dsw-alias-scrollbar-hover-l1: var(--dsw-static-neutral-300);
+  --dsw-alias-scrollbar-hover-l2: var(--dsw-static-neutral-300);
+  --dsw-alias-state-business-primary: var(--dsw-static-deepseek-500);
+  --dsw-alias-state-business-tertiary: var(--dsw-static-deepseek-100);
+  --dsw-alias-code-diff-added: var(--dsw-static-green-500-a08);
+  --dsw-alias-code-diff-deleted: var(--dsw-static-red-600-a08);
+  --dsw-alias-file-diff-added-bg: rgb(230, 244, 231);
+  --dsw-alias-file-diff-added-gutter: rgb(237, 247, 237);
+  --dsw-alias-file-diff-added-marker: rgb(1, 162, 65);
+  --dsw-alias-file-diff-deleted-bg: rgb(252, 230, 226);
+  --dsw-alias-file-diff-deleted-gutter: rgb(253, 236, 233);
+  --dsw-alias-file-diff-deleted-marker: rgb(186, 39, 35);
+  --dsw-alias-state-error-primary: var(--dsw-static-red-600);
+  --dsw-alias-state-error-secondary: var(--dsw-static-red-400);
+  --dsw-alias-state-idle-primary: var(--dsw-static-neutral-300);
+  --dsw-alias-state-success-primary: var(--dsw-static-green-500);
+  --dsw-alias-state-success-secondary: var(--dsw-static-green-400);
+  --dsw-alias-state-success-tertiary: var(--dsw-static-green-100);
+  --dsw-alias-state-warn-label: var(--dsw-static-amber-600);
+  --dsw-alias-state-warn-primary: var(--dsw-static-amber-500);
+  --dsw-alias-state-warn-secondary: var(--dsw-static-amber-400);
+  --dsw-alias-state-warn-tertiary: var(--dsw-static-amber-100);
+  --dsw-alias-switch-thumb: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-toast-bg: var(--dsw-static-neutral-bluish-800);
+  --dsw-alias-toast-label: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-tooltip-bg: var(--dsw-static-neutral-bluish-850);
+  --dsw-alias-tooltip-key-bg: color-mix(in srgb, var(--dsw-alias-tooltip-bg), white 18%);
+  --dsw-alias-turn-trigger-bg: var(--dsw-alias-markdown-code-block);
+  --dsw-alias-turn-trigger-bg-hover: var(--dsw-alias-interactive-bg-hover);
+  --dsw-specific-bubble-highlight: var(--dsw-static-deepseek-200);
+  --dsw-specific-bubble: var(--dsw-static-deepseek-50);
+  --dsw-specific-input-major: var(--dsw-static-neutral-bluish-00);
+  --dsw-specific-login-input: var(--dsw-static-neutral-bluish-50);
+  --dsw-menu-surface-fill: rgba(248, 249, 250, 0.58);
+  --dsw-alias-menu-group-header-fill: rgba(248, 249, 250, 0.94);
+  --dsw-specific-menu: var(--dsw-menu-surface-fill);
+  --dsw-specific-selector: var(--dsw-static-neutral-bluish-60);
+  --dsw-specific-sidebar-fill: var(--dsw-static-neutral-bluish-50);
+  --dsw-specific-sidebar-nav-item-active-accent: var(--dsw-static-deepseek-100);
+  --dsw-specific-sidebar-nav-item-active: var(--dsw-static-neutral-bluish-100);
+  --dsw-specific-sidebar-nav-item-hover: var(--dsw-static-neutral-bluish-75);
+  --dsw-specific-tip: var(--dsw-static-neutral-bluish-60);
+
+  background-color: var(--dsw-alias-bg-base);
+}
+
+.win[data-ds-dark-theme] {
+  --dsw-alias-bg-base: var(--dsw-static-neutral-bluish-950);
+  --dsw-alias-bg-document-preview: var(--dsw-static-neutral-bluish-950);
+  --dsw-alias-bg-document-selection: color-mix(in srgb, var(--dsw-static-blue-500) 40%, transparent);
+  --dsw-alias-label-document-preview: var(--dsw-static-neutral-bluish-300);
+  --dsw-alias-bg-layer-1: var(--dsw-static-neutral-bluish-875);
+  --dsw-alias-bg-layer-2: var(--dsw-static-neutral-bluish-850);
+  --dsw-alias-bg-layer-3: var(--dsw-static-neutral-bluish-800);
+  --dsw-alias-bg-mask-1: rgba(0, 0, 0, 0.5);
+  --dsw-alias-bg-mask-2: rgba(0, 0, 0, 0.2);
+  --dsw-alias-bg-mask-3: rgba(0, 0, 0, 0.48);
+  --dsw-alias-bg-mask-photo: rgba(0, 0, 0, 0.88);
+  --dsw-alias-bg-mask-drop: rgba(39, 39, 48, 0.7);
+  --dsw-alias-bg-module-platform: var(--dsw-static-neutral-bluish-800);
+  --dsw-alias-bg-multi-select: var(--dsw-static-neutral-850);
+  --dsw-alias-bg-overlay: var(--dsw-static-neutral-bluish-700);
+  --dsw-alias-bg-skeleton: rgba(255, 255, 255, 0.08);
+  --dsw-alias-border-inverted2: rgba(255, 255, 255, 0.08);
+  --dsw-alias-border-inverted: rgba(255, 255, 255, 0.06);
+  --dsw-alias-border-l1: rgba(255, 255, 255, 0.06);
+  --dsw-alias-border-l2-darkmode-thin: rgba(255, 255, 255, 0.06);
+  --dsw-alias-border-l2: rgba(255, 255, 255, 0.12);
+  --dsw-alias-border-l3: rgba(255, 255, 255, 0.16);
+  --dsw-alias-border-l4: rgba(255, 255, 255, 0.2);
+  --dsw-alias-brand-primary-invert: var(--dsw-static-neutral-bluish-50);
+  --dsw-alias-brand-primary-new-colorprimary-new-color: var(--dsw-static-deepseek-450);
+  --dsw-alias-brand-primary: var(--dsw-static-neutral-bluish-50);
+  --dsw-alias-brand-text: var(--dsw-static-neutral-bluish-50);
+  --dsw-alias-button-contrast-fill: var(--dsw-static-neutral-bluish-50);
+  --dsw-alias-button-elevated-fill: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-button-floating-fill: var(--dsw-static-neutral-bluish-850);
+  --dsw-alias-button-floating-hover: var(--dsw-static-neutral-bluish-800);
+  --dsw-alias-button-ghost-active-border: var(--dsw-static-neutral-bluish-600);
+  --dsw-alias-button-ghost-active-fill: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-button-ghost-active-hover: var(--dsw-static-neutral-bluish-700);
+  --dsw-alias-button-info-fill: var(--dsw-static-deepseek-400);
+  --dsw-alias-button-info-hover: var(--dsw-static-deepseek-500);
+  --dsw-alias-button-primary-dimmed: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-button-primary-fill: var(--dsw-alias-brand-primary);
+  --dsw-alias-button-primary-hover: var(--dsw-static-neutral-bluish-100);
+  --dsw-alias-button-tool-bar-fill-invisible: rgba(31, 31, 31, 0.36);
+  --dsw-alias-button-tool-bar-fill: rgba(84, 85, 87, 0.5);
+  --dsw-alias-button-tool-bar-hover: rgba(84, 85, 87, 0.6);
+  --dsw-alias-interactive-bg-active: rgba(255, 255, 255, 0.14);
+  --dsw-alias-interactive-bg-hover-accent: rgba(255, 255, 255, 0.24);
+  --dsw-alias-interactive-bg-hover-danger: rgba(242, 90, 90, 0.15);
+  --dsw-alias-interactive-bg-hover-solid: var(--dsw-static-neutral-bluish-800);
+  --dsw-alias-interactive-bg-hover: rgba(255, 255, 255, 0.08);
+  --dsw-alias-label-caption: var(--dsw-static-neutral-bluish-600);
+  --dsw-alias-label-deep-diving: color-mix(in srgb, var(--dsw-static-deepseek-450) 55%, var(--dsw-static-neutral-bluish-400));
+  --dsw-alias-label-deep-diving-shimmer: color-mix(in srgb, var(--dsw-static-blue-300) 65%, var(--dsw-static-deepseek-400));
+  --dsw-alias-label-dimmed: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-label-primary-bluish: var(--dsw-static-neutral-bluish-50);
+  --dsw-alias-label-primary-dimmed: var(--dsw-static-neutral-bluish-100);
+  --dsw-alias-label-primary-foreground: var(--dsw-static-neutral-bluish-1000);
+  --dsw-alias-label-primary-inverted: var(--dsw-static-neutral-bluish-800);
+  --dsw-alias-label-primary: var(--dsw-static-neutral-bluish-50);
+  --dsw-alias-label-secondary: var(--dsw-static-neutral-bluish-300);
+  --dsw-alias-label-shimmer: color-mix(in srgb, var(--dsw-static-neutral-00) 45%, transparent);
+  --dsw-alias-label-tertiary: var(--dsw-static-neutral-bluish-400);
+  --dsw-alias-menu-icon: var(--dsw-alias-label-primary-dimmed);
+  --dsw-alias-link: var(--dsw-static-deepseek-400);
+  --dsw-alias-markdown-citation: var(--dsw-static-neutral-bluish-800);
+  --dsw-alias-markdown-code-block-banner: var(--dsw-static-neutral-bluish-850);
+  --dsw-alias-markdown-code-block: var(--dsw-static-neutral-bluish-900);
+  --dsw-alias-markdown-code-segment-selected: var(--dsw-static-neutral-bluish-800);
+  --dsw-alias-markdown-code-segment-unselected: var(--dsw-static-neutral-bluish-900);
+  --dsw-alias-markdown-inline-code: var(--dsw-static-neutral-800);
+  --dsw-alias-markdown-placeholder: var(--dsw-static-neutral-bluish-850);
+  --dsw-alias-markdown-tag: var(--dsw-static-neutral-bluish-850);
+  --dsw-alias-scrollbar-bg-l1: var(--dsw-static-neutral-700);
+  --dsw-alias-scrollbar-bg-l2: var(--dsw-static-neutral-600);
+  --dsw-alias-scrollbar-hover-l1: var(--dsw-static-neutral-600);
+  --dsw-alias-scrollbar-hover-l2: var(--dsw-static-neutral-550);
+  --dsw-alias-state-business-primary: var(--dsw-static-deepseek-400);
+  --dsw-alias-state-business-tertiary: var(--dsw-static-deepseek-800);
+  --dsw-alias-code-diff-added: var(--dsw-static-green-500-a12);
+  --dsw-alias-code-diff-deleted: var(--dsw-static-red-400-a12);
+  --dsw-alias-file-diff-added-bg: rgb(31, 49, 36);
+  --dsw-alias-file-diff-added-gutter: rgb(19, 32, 22);
+  --dsw-alias-file-diff-added-marker: rgb(65, 201, 119);
+  --dsw-alias-file-diff-deleted-bg: rgb(60, 31, 27);
+  --dsw-alias-file-diff-deleted-gutter: rgb(40, 19, 14);
+  --dsw-alias-file-diff-deleted-marker: rgb(250, 66, 62);
+  --dsw-alias-state-error-primary: var(--dsw-static-red-400);
+  --dsw-alias-state-error-secondary: var(--dsw-static-red-400);
+  --dsw-alias-state-idle-primary: var(--dsw-static-neutral-600);
+  --dsw-alias-state-success-primary: var(--dsw-static-green-500);
+  --dsw-alias-state-success-secondary: var(--dsw-static-green-400);
+  --dsw-alias-state-success-tertiary: var(--dsw-static-green-900);
+  --dsw-alias-state-warn-label: var(--dsw-static-amber-600);
+  --dsw-alias-state-warn-primary: var(--dsw-static-amber-500);
+  --dsw-alias-state-warn-secondary: var(--dsw-static-amber-400);
+  --dsw-alias-state-warn-tertiary: var(--dsw-static-amber-900);
+  --dsw-alias-switch-thumb: var(--dsw-static-neutral-bluish-400);
+  --dsw-alias-toast-bg: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-toast-label: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-turn-trigger-bg: var(--dsw-alias-interactive-bg-hover);
+  --dsw-alias-turn-trigger-bg-hover: var(--dsw-alias-interactive-bg-active);
+  --dsw-alias-tooltip-bg: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-tooltip-key-bg: color-mix(in srgb, var(--dsw-alias-tooltip-bg), white 18%);
+  --dsw-specific-bubble-highlight: var(--dsw-static-neutral-bluish-750);
+  --dsw-specific-bubble: var(--dsw-static-neutral-bluish-850);
+  --dsw-specific-input-major: var(--dsw-static-neutral-bluish-850);
+  --dsw-specific-login-input: var(--dsw-static-neutral-bluish-900);
+  --dsw-menu-surface-fill: rgba(67, 69, 74, 0.45);
+  --dsw-alias-menu-group-header-fill: rgba(48, 49, 54, 0.94);
+  --dsw-specific-menu: var(--dsw-menu-surface-fill);
+  --dsw-specific-selector: var(--dsw-static-neutral-bluish-800);
+  --dsw-specific-sidebar-fill: var(--dsw-static-neutral-bluish-900);
+  --dsw-specific-sidebar-nav-item-active-accent: var(--dsw-static-neutral-bluish-800);
+  --dsw-specific-sidebar-nav-item-active: var(--dsw-static-neutral-bluish-750);
+  --dsw-specific-sidebar-nav-item-hover: var(--dsw-static-neutral-bluish-850);
+  --dsw-specific-tip: var(--dsw-static-neutral-bluish-800);
+}
+
+/* Overlays without MenuSurface's opaque backing cannot blur page content over
+ * native vibrancy reliably, so their fill stays nearly opaque on macOS. */
+html[data-platform='darwin'] .win {
+  --dsw-specific-menu: rgba(248, 249, 250, 0.94);
+}
+
+html[data-platform='darwin'] .win[data-ds-dark-theme] {
+  --dsw-specific-menu: rgba(48, 49, 54, 0.94);
+}
+
+/* ── base.css（基础变量：字体栈、圆角阶、缓动） ── */
+/* Base variables referenced by the token sheets and component CSS but defined
+ * upstream (deepsuite theme/global.css) — supplied here so the composite
+ * --dsw-font-* variables resolve and motion rides the upstream curve. Code
+ * font stack deliberately omits a bare `monospace` tail (Windows CJK falls
+ * back to SimSun otherwise). */
+:root {
+  --dsw-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --dsw-font-family-brand: 'Montserrat', var(--dsw-font-family);
+  --ds-font-family-code: 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas,
+    'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei';
+  --ds-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ds-transition-duration: 0.2s;
+  --ds-transition-duration-fast: 0.1s;
+  --ds-transition-duration-slow: 0.3s;
+  --dsw-radius-xs: 4px;
+  --dsw-radius-sm: 8px;
+  --dsw-radius-md: 12px;
+  --dsw-radius-lg: 16px;
+  --dsw-radius-xl: 20px;
+  --dsw-radius-panel: 28px;
+}
+
+.win {
+  --dsw-alias-settings-card-fill: var(--dsw-alias-bg-layer-2);
+  --dsw-alias-settings-card-stroke: var(--dsw-alias-border-l4);
+}
+
+[data-dsh-automatic-focus]:focus,
+[data-dsh-automatic-focus]:focus:focus-visible {
+  outline: none;
+}
+
+/* ── focus.css（焦点环宽度与颜色） ── */
+/* Components own offsets; dense tables and toolbars may keep a 1px ring. */
+:root {
+  --dsw-focus-ring-width: 2px;
+}
+
+/* The fallback names the colour and the standard width, never the style: a control that
+ * disables its outline keeps `none` and paints nothing. Without the width, Chromium's
+ * unnamed ring stayed at `auto 1px` while every declared ring used the standard geometry.
+ * Declared rings also read this color, including rings on descendants and pseudo-elements. */
+:focus-visible {
+  outline-color: var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-width: var(--dsw-focus-ring-width);
+}
+
+/* ui-primitives/input-modality publishes the attribute. Editable controls keep
+ * their focus feedback on click; other controls reveal rings on keyboard
+ * navigation. Only ring paint is suppressed, not elevation or selected borders. */
+html[data-input-modality='pointer'] .win :focus-visible:not(:read-write) {
+  --dsw-focus-ring-color: transparent;
+  outline-color: transparent;
+}
+/* ↑↑↑ verbatim 拷贝到此为止 ↑↑↑ */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   1. 稿子自己的骨架（不是设计的一部分，只是把窗口摆出来）
+   ══════════════════════════════════════════════════════════════════════════ */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--dsw-font-family);
+  background: #8a8f98;   /* 舞台底色，只在画廊模式露出来；窗口内部才是真界面 */
+  color: #1b1b1c;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; background: none; border: none; padding: 0; cursor: pointer; }
+input, textarea { font: inherit; color: inherit; }
+
+/* ---- 顶部控制条（bare=1 时整条不渲染） ---- */
+.ctl {
+  position: sticky; top: 0; z-index: 50;
+  background: #16181d; color: #e9ebef;
+  border-bottom: 1px solid #2b2f38;
+  padding: 10px 14px; display: grid; gap: 8px;
+  font-size: 13px;
+}
+.ctlrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ctlrow > b { width: 40px; font-weight: 600; color: #a4acb9; font-size: 12px; }
+.ctlchip {
+  border: 1px solid #3a3f4a; border-radius: 999px;
+  padding: 3px 11px; font-size: 12px; line-height: 18px; color: #a4acb9;
+}
+.ctlchip.on { background: #2b2f38; border-color: #5a6170; color: #f7f8fa; }
+.ctlhint { color: #7b8492; font-size: 12px; }
+
+/* ---- 画廊 ---- */
+.gallery { padding: 20px; display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+.gcell { margin: 0; display: grid; gap: 7px; }
+.gwin { overflow: hidden; border-radius: 8px; box-shadow: 0 8px 22px rgba(0,0,0,.3); position: relative; }
+.gsc { transform-origin: top left; }
+.gcell figcaption { font-size: 12px; line-height: 17px; color: #f2f4f7; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.gcell figcaption i { display: block; font-style: normal; color: #c8ccd3; font-size: 11px; }
+
+/* ---- 一个窗口 = 一次渲染的单元 ---- */
+.win {
+  display: grid;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  border-radius: 10px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  box-shadow: 0 18px 50px rgba(0,0,0,.34), 0 2px 8px rgba(0,0,0,.18);
+}
+.stage { padding: 26px; display: flex; justify-content: center; align-items: flex-start; }
+/* 截图模式：窗口就是画布本身，不留舞台留白、不画圆角与投影，
+   否则截出来的图四周会裹一层画布底色。 */
+.stage.shot { padding: 0; }
+.stage.shot .win { border-radius: 0; border: 0; box-shadow: none; }
+
+/* ---- DSH 侧栏：稿子里只画本插件那一项，其余是外壳示意 ---- */
+.side {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 12px; min-width: 0; overflow: hidden;
+  background: var(--dsw-specific-sidebar-fill);
+  border-right: 0.5px solid var(--dsw-alias-border-l3);
+}
+.sbrand { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 2px; }
+.smark {
+  width: 20px; height: 20px; flex: none; border-radius: 5px;
+  background: var(--dsw-alias-brand-primary); color: var(--dsw-alias-label-primary-inverted);
+  display: grid; place-items: center; font-size: 11px; font-weight: 700;
+}
+.sname { font-size: 13px; font-weight: 600; line-height: 20px; white-space: nowrap; }
+.swire {
+  border: 1px dashed var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-md);
+  padding: 10px; font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-tertiary);
+}
+.swire i { font-style: normal; color: var(--dsw-alias-label-caption); }
+.spanels { display: flex; flex-direction: column; gap: 4px; margin: 0 2px; }
+.srow {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 36px; padding: 7px 8px; border-radius: var(--dsw-radius-md);
+  color: var(--dsw-alias-label-primary); font-size: 14px; line-height: 22px; text-align: left;
+}
+.srow.on { background: var(--dsw-specific-sidebar-nav-item-active); }
+.srow svg { flex: none; }
+.srow span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sfoot { margin-top: auto; display: flex; gap: 6px; padding: 0 2px; }
+.sdot { width: 28px; height: 28px; border-radius: 999px; background: var(--dsw-alias-interactive-bg-hover); }
+
+/* 侧栏收起（宽窗 <1024 时 ui-sidebar 自动收起，稿子用 narrow 档模拟）：
+   只留图标，文字整块隐掉。上一版文字照画，被 .side 的 overflow:hidden 切掉
+   3px，看着像坏了。 */
+.win[data-collapsed] .sname,
+.win[data-collapsed] .swire,
+.win[data-collapsed] .srow span,
+.win[data-collapsed] .sfoot { display: none; }
+.win[data-collapsed] .sbrand { justify-content: center; padding: 0; }
+.win[data-collapsed] .side { align-items: center; }
+/* .spanels 有 margin 0 2px、.srow 有 padding 7px 8px，收起后这一套在 56px 里
+   比可用宽多出 3px，正好被 .side 的 overflow:hidden 切一条边。 */
+.win[data-collapsed] .spanels { margin: 0; width: 100%; }
+.win[data-collapsed] .srow { justify-content: center; padding: 7px; }
+.win[data-collapsed] .side { padding: 12px 10px; align-items: center; }
+.win[data-collapsed] .smark { width: 24px; height: 24px; }
+.win[data-collapsed] .sname,
+.win[data-collapsed] .swire,
+.win[data-collapsed] .srow span { display: none; }
+.win[data-collapsed] .srow { width: 36px; justify-content: center; padding: 7px 0; }
+.win[data-collapsed] .sfoot { flex-direction: column; }
+
+/* ---- 面板本体 ---- */
+.main { min-width: 0; overflow: hidden; background: var(--dsw-alias-bg-base); display: flex; }
+.panel {
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; padding: 18px 20px 16px;
+}
+.pwrap {
+  flex: 1 1 auto; min-height: 0; width: 100%; max-width: 880px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 12px;
+  /* 设置这类「一屏塞好几张卡」的屏，窄窗下内容会顶出窗口。
+     与其让它被 .main 的 overflow:hidden 切掉 12px，不如让这一层自己滚。
+     用 .scroll 的屏内容本来就在 .scroll 里滚，这里不会出现滚动条。 */
+  overflow-y: auto;
+}
+.phead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ptitle { margin: 0; font-size: 20px; line-height: 28px; font-weight: 500; letter-spacing: .01em; }
+.psub { margin: -6px 0 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
+.grow { flex: 1 1 auto; }
+.badge {
+  flex: none; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor;
+  font-size: 12px; line-height: 18px; white-space: nowrap;
+}
+.t-ok { color: var(--dsw-alias-state-success-primary); }
+.t-warn { color: var(--dsw-alias-state-warn-primary); }
+.t-err { color: var(--dsw-alias-state-error-primary); }
+.t-idle { color: var(--dsw-alias-label-tertiary); }
+
+/* 按钮：照 ui-primitives/Button.module.css 的 .sm + variant */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: 28px; padding: 0 10px; border-radius: var(--dsw-radius-sm);
+  font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-primary);
+  white-space: nowrap;
+}
+.btn.md { height: 36px; padding: 0 14px; border-radius: var(--dsw-radius-md); font-size: 14px; line-height: 22px; }
+.btn.primary { background: var(--dsw-alias-button-primary-fill); color: var(--dsw-alias-label-primary-foreground); }
+.btn.outline { border: 0.5px solid var(--dsw-alias-border-l3); }
+.btn.icon { width: 28px; padding: 0; }
+.btn.ghost:hover, .btn.outline:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.btn[disabled] { opacity: .4; }
+
+/* 节点条 */
+.nodebar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 12px; border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1); border: 0.5px solid var(--dsw-alias-border-l2);
+  font-size: 13px; line-height: 20px;
+}
+.led { width: 7px; height: 7px; border-radius: 999px; flex: none; background: var(--dsw-alias-state-success-primary); }
+.led.off { background: var(--dsw-alias-state-idle-primary); }
+.led.warn { background: var(--dsw-alias-state-warn-primary); }
+.led.err { background: var(--dsw-alias-state-error-primary); }
+.dim { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+.mono { font-family: var(--ds-font-family-code); font-size: 12px; }
+
+/* 搜索框：照 ui-primitives/Input.module.css */
+.search {
+  display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px;
+  border: 0.5px solid var(--dsw-alias-border-l4); border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+}
+.search svg { flex: none; color: var(--dsw-alias-label-tertiary); }
+.search .ph { flex: 1; min-width: 0; font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-dimmed); text-align: left; }
+.search .ph.filled { color: var(--dsw-alias-label-primary); }
+
+/* 过滤条 */
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  padding: 3px 10px; border-radius: 999px; font-size: 12px; line-height: 18px;
+  color: var(--dsw-alias-label-secondary); border: 0.5px solid var(--dsw-alias-border-l3);
+}
+.chip b { font-weight: 500; color: var(--dsw-alias-label-caption); margin-left: 2px; }
+.chip.on { background: var(--dsw-alias-button-ghost-active-fill); border-color: var(--dsw-alias-button-ghost-active-border); color: var(--dsw-alias-label-primary); }
+.chip.on b { color: var(--dsw-alias-label-secondary); }
+
+/* 横幅 */
+.banner {
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 9px 12px; border-radius: var(--dsw-radius-md); font-size: 13px; line-height: 20px;
+  background: var(--dsw-alias-state-warn-tertiary); color: var(--dsw-alias-state-warn-label);
+}
+.banner.info { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); }
+.banner.ok { background: var(--dsw-alias-state-success-tertiary); color: var(--dsw-alias-state-success-primary); }
+.banner.err { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-state-error-primary); }
+
+/* 滚动区 */
+.scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.rows { display: flex; flex-direction: column; gap: 6px; }
+
+/* 会话行：整行可点，一行一张卡 */
+.crow {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 10px 12px; border-radius: var(--dsw-radius-md);
+  border: 0.5px solid transparent; background: var(--dsw-alias-bg-layer-1);
+}
+.crow:hover { background: var(--dsw-alias-interactive-bg-hover-solid); }
+.crow[aria-current] { border-color: var(--dsw-alias-button-ghost-active-border); }
+.av { position: relative; flex: none; width: 38px; height: 38px; }
+.avc {
+  width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--dsw-alias-bg-layer-3); color: var(--dsw-alias-label-secondary);
+  font-size: 15px; font-weight: 500;
+}
+.av[data-online] .avc { background: var(--dsw-alias-state-business-tertiary); color: var(--dsw-alias-state-business-primary); }
+.avb { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 999px; border: 2px solid var(--dsw-alias-bg-layer-1); }
+.avb.on { background: var(--dsw-alias-state-success-primary); }
+.avb.off { background: var(--dsw-alias-state-idle-primary); }
+.cbody { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+.l1 { display: flex; align-items: baseline; gap: 8px; }
+.cnick { font-size: 14px; line-height: 20px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cnick.unknown { color: var(--dsw-alias-label-tertiary); font-weight: 400; font-style: italic; }
+.ctime { flex: none; margin-left: auto; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-caption); }
+.l2 { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 13px; line-height: 19px; color: var(--dsw-alias-label-tertiary); }
+.pre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dir { flex: none; font-size: 11px; line-height: 15px; padding: 0 4px; border-radius: 4px; background: var(--dsw-alias-bg-layer-3); color: var(--dsw-alias-label-tertiary); }
+
+/* 对话详情 */
+.thead { display: flex; align-items: center; gap: 10px; }
+.tpeer { min-width: 0; display: grid; gap: 1px; }
+.tname { font-size: 14px; line-height: 20px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msgs { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; }
+.msg { max-width: min(560px, 82%); display: grid; gap: 3px; padding: 8px 11px; border-radius: var(--dsw-radius-md); font-size: 13px; line-height: 20px; }
+.msg.in { align-self: flex-start; background: var(--dsw-alias-bg-layer-2); border: 0.5px solid var(--dsw-alias-border-l2); }
+.msg.out { align-self: flex-end; background: var(--dsw-alias-state-business-tertiary); }
+/* 照上一版面板的 messageFrom：一行（「收 · Office Mac mini」），
+   相对时间另起一行。上一版把两者拼成了一行，还把时间写成了「2 天前」（at
+   当成「距今偏移」算出来的）。 */
+.msg .who { font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-caption); display: grid; }
+.msg .wtime { font-size: 10px; line-height: 14px; color: var(--dsw-alias-label-tertiary); }
+.msg .txt { white-space: pre-wrap; word-break: break-word; }
+.daysep { align-self: center; font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-caption); }
+.composer {
+  flex: none; margin-top: 12px; padding: 10px 12px 12px; display: grid; gap: 8px;
+  border-radius: var(--dsw-radius-lg); background: var(--dsw-alias-bg-layer-1);
+  border: 0.5px solid var(--dsw-alias-border-l2);
+}
+.ta { width: 100%; min-height: 52px; resize: none; border: none; outline: none; background: transparent; font-size: 13px; line-height: 20px; }
+.ta.ph { color: var(--dsw-alias-label-dimmed); }
+.comrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* 输入区能力排。
+   形态照茶话间 `ChatPane.vue` 的 .toolbar（一条横排 + tool-hint + spacer），
+   但**清单按面板真能做什么给**：控制面 `POST /v1/send` 只收 { to, text }，
+   所以能进列表的只有表情一项，其余五项为什么不画见 p-thread 的 annot ——
+   那几行理由比多画五个灰图标值钱。 */
+.toolbar { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.tool { width: 28px; height: 28px; display: inline-grid; place-items: center;
+  border: 0; background: transparent; color: var(--dsw-alias-label-secondary);
+  border-radius: var(--dsw-radius-sm); }
+.tool:disabled { color: var(--dsw-alias-label-dimmed); opacity: 0.45; }
+.tool-hint { margin-left: 8px; font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-caption); }
+
+/* 字段 */
+/* flex:none —— 配合上面 .pwrap 的 overflow-y:auto：卡片保持自然高度，
+   装不下就滚，不被压扁。 */
+.card { flex: none; border-radius: var(--dsw-radius-lg); background: var(--dsw-alias-settings-card-fill); border: 0.5px solid var(--dsw-alias-settings-card-stroke); padding: 14px; display: grid; gap: 12px; }
+.sechead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.sectitle { font-size: 14px; line-height: 20px; font-weight: 600; }
+.field { display: grid; gap: 5px; }
+.flabel { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
+.inp {
+  display: flex; align-items: center; height: 32px; padding: 0 8px;
+  border: 0.5px solid var(--dsw-alias-border-l4); border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1); font-size: 14px; line-height: 22px;
+}
+.inp.ph { color: var(--dsw-alias-label-dimmed); }
+.inp.focus { border-color: var(--dsw-alias-state-business-primary); }
+.inp[disabled] { opacity: .5; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.hint { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
+
+/* 空态 */
+.empty { padding: 26px 16px; display: grid; gap: 6px; justify-items: center; text-align: center; }
+.empty .et { font-size: 14px; line-height: 20px; font-weight: 600; }
+.empty .eh { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); max-width: 380px; }
+
+/* 菜单：照 ui-primitives/Menu.module.css */
+.menu {
+  position: absolute; z-index: 40; min-width: 208px; padding: 4px;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-overlay);
+  box-shadow: var(--dsw-elevation-prominent);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
+}
+.mitem { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 34px; padding: 6px 8px; border-radius: var(--dsw-radius-md); font-size: 13px; line-height: 20px; text-align: left; }
+.mitem:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.mitem svg { flex: none; color: var(--dsw-alias-menu-icon); }
+.mitem .key { margin-left: auto; font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-caption); }
+.msep { height: 0.5px; margin: 3px 2px; background: var(--dsw-alias-border-l2); }
+
+/* 骨架 */
+.sk { border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-skeleton); }
+
+/* 设计注释：稿子的旁白，不是界面的一部分 */
+.annot {
+  margin-top: 4px; padding: 10px 12px 10px 12px;
+  border-left: 2px solid var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-bg-layer-2);
+  border-radius: 0 var(--dsw-radius-md) var(--dsw-radius-md) 0;
+  font-size: 12px; line-height: 19px; color: var(--dsw-alias-label-secondary);
+}
+.annot b { color: var(--dsw-alias-label-primary); }
+.annot code { font-family: var(--ds-font-family-code); font-size: 11px; padding: 0 3px; border-radius: 4px; background: var(--dsw-alias-markdown-inline-code); }
+.annot .tag { display: inline-block; font-size: 10px; line-height: 15px; padding: 0 6px; border-radius: 999px; border: 0.5px solid var(--dsw-alias-border-l3); color: var(--dsw-alias-label-tertiary); margin-right: 6px; }
+.annot p { margin: 0 0 6px; }
+.annot p:last-child { margin-bottom: 0; }
+
+/* 窄面板：照面板自己的 @media (max-width: 560px) */
+.win[data-narrow] .panel { padding: 12px; }
+.win[data-narrow] .msg { max-width: 100%; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════════════════
+   形态：一个窗口有多大 + 侧栏是展开还是收起 + 深色还是浅色
+   侧栏宽度取自 ui-layout/src/client/columns.ts：SIDEBAR_DEFAULT=280、
+   SIDEBAR_COLLAPSED=56（<1024 视口自动收起，SIDEBAR_AUTO_COLLAPSE=1024）。
+   ══════════════════════════════════════════════════════════════════════════ */
+const FORMS = [
+  { id: 'wide-dark',   w: 1440, h: 900, side: 280, theme: 'dark',  label: '宽窗 · 深色', short: '宽深' },
+  { id: 'wide-light',  w: 1440, h: 900, side: 280, theme: 'light', label: '宽窗 · 浅色', short: '宽浅' },
+  { id: 'narrow-dark', w: 600,  h: 760, side: 56,  theme: 'dark',  label: '窄窗 · 深色', short: '窄深' },
+];
+const FORM = {};
+FORMS.forEach(f => { FORM[f.id] = f; });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   屏
+   ══════════════════════════════════════════════════════════════════════════ */
+const SCREENS = [
+  { id: 'p-home',        label: '最近会话',            group: '列表' },
+  { id: 'p-home-empty',  label: '最近会话 · 还没有邻居', group: '列表' },
+  { id: 'p-home-filter', label: '最近会话 · 过滤',       group: '列表' },
+  { id: 'p-more',        label: '最近会话 · 更多菜单',   group: '列表' },
+  { id: 'p-thread',      label: '对话 · 有消息',        group: '对话' },
+  { id: 'p-thread-empty',label: '对话 · 还没消息',      group: '对话' },
+  { id: 'p-thread-queued',label:'对话 · 发出后已入队',   group: '对话' },
+  { id: 'p-compose',     label: '新建消息（填收件人）',  group: '对话' },
+  { id: 'p-unreachable', label: '连不上控制面',         group: '异常' },
+  { id: 'p-unauthorized',label: '需要令牌',             group: '异常' },
+  { id: 'p-loading',     label: '加载中',               group: '异常' },
+  { id: 'p-settings',    label: '设置',                 group: '设置' },
+  { id: 'p-credential',  label: '访问令牌',             group: '设置' },
+];
+const SCREENFN = {};
+
+/* 画廊：一页看全，按屏分组。 */
+const GALLERY = [
+  ['p-home', 'wide-dark'], ['p-thread', 'wide-dark'], ['p-home-empty', 'wide-dark'],
+  ['p-more', 'wide-dark'], ['p-thread-queued', 'wide-dark'], ['p-home-filter', 'wide-dark'],
+  ['p-thread-empty', 'wide-dark'], ['p-unreachable', 'wide-dark'], ['p-unauthorized', 'wide-dark'],
+  ['p-compose', 'wide-dark'], ['p-settings', 'wide-dark'], ['p-credential', 'wide-dark'],
+  ['p-loading', 'wide-dark'], ['p-home', 'wide-light'], ['p-thread', 'wide-light'],
+  ['p-settings', 'wide-light'], ['p-unreachable', 'wide-light'], ['p-home', 'narrow-dark'],
+  ['p-thread', 'narrow-dark'], ['p-settings', 'narrow-dark'],
+];
+
+/* ══════════════════════════════════════════════════════════════════════════
+   假数据。字段名逐个照 model.ts，一个字都不多：
+     TidingsPeerView   nodeId nick host udpPort tcpPort platform online lastSeen profileRev
+     TidingsMessageView seq peerId peerLabel direction at kind text
+     TidingsHealthView  ok nodeId nick platform udpPort httpPort peers online pending uptimeMs
+   时间用固定基准 NOW，保证每次渲染出的相对时间完全一样（截图可复现）。
+   ══════════════════════════════════════════════════════════════════════════ */
+const NOW = Date.parse('2026-10-07T23:20:00+08:00');
+const SEC = 1000, MIN = 60 * SEC, HOUR = 60 * MIN, DAY = 24 * HOUR;
+
+const HEALTH = {
+  ok: true,
+  nodeId: '2f4c8e31-6a57-4d20-b8f1-9c3e7a4d5b06',
+  nick: '本机的捎话',
+  platform: 'macOS 15.0 · arm64',
+  udpPort: 17878,
+  httpPort: 8788,
+  peers: 5,
+  online: 2,
+  pending: 1,
+  uptimeMs: 3 * HOUR + 12 * MIN,
+};
+
+/* 注意单位：`lastSeen` / `at` 是**绝对 epoch 毫秒**，和真代码一致 ——
+   `relativeTime(t, at)` 内部算的是 `(Date.now() - at) / 1000`（上一版面板的 relativeTime）。
+   所以这里写的是 NOW 减去一个偏移，不是直接写偏移；渲染时一律 relTime(NOW - x)。 */
+const PEERS = [
+  { nodeId: 'b1f0c3d8-4a72-4c19-9f0e-7d2a5c8b1e34', nick: 'Office Mac mini', host: '192.0.2.31', udpPort: 17878, tcpPort: 17879, platform: 'macOS 15.0 · arm64', online: true,  lastSeen: NOW - 2 * MIN },
+  { nodeId: '7c2e91aa-5b03-4d8e-8a11-3f6c0d9e2b57', nick: 'Pixel 6',        host: '192.0.2.22', udpPort: 17891, platform: 'Android 15 · arm64', online: true,  lastSeen: NOW - 30 * SEC },
+  { nodeId: 'e40b7f12-9d6c-4a35-b7c2-8e1f4a6d0c93', nick: 'Study iMac',      host: '192.0.2.40', udpPort: 17878, tcpPort: 17879, platform: 'macOS 14.6 · x86_64', online: false, lastSeen: NOW - 3 * HOUR },
+  { nodeId: '192.0.2.77', nick: '', host: '192.0.2.77', platform: '', online: false, lastSeen: NOW - 26 * HOUR },
+  { nodeId: 'a93b0f54-7c81-4e6d-90ab-2d5f8c1e7b40', nick: 'iPad Air',       host: '192.0.2.55', udpPort: 17878, platform: 'iPadOS 18.1', online: false, lastSeen: NOW - 2 * DAY },
+];
+
+const MSGS = [
+  { seq: 421, peerId: '7c2e91aa-5b03-4d8e-8a11-3f6c0d9e2b57', peerLabel: 'Pixel 6', direction: 'in',  at: NOW - 30 * SEC,     kind: 'text', text: '在，怎么了' },
+  { seq: 420, peerId: '7c2e91aa-5b03-4d8e-8a11-3f6c0d9e2b57', peerLabel: 'Pixel 6', direction: 'out', at: NOW - 40 * SEC,     kind: 'text', text: '在吗？' },
+  { seq: 419, peerId: 'b1f0c3d8-4a72-4c19-9f0e-7d2a5c8b1e34', peerLabel: 'Office Mac mini', direction: 'in',  at: NOW - 2 * MIN,      kind: 'text', text: '好了，谢谢！' },
+  { seq: 418, peerId: 'b1f0c3d8-4a72-4c19-9f0e-7d2a5c8b1e34', peerLabel: 'Office Mac mini', direction: 'out', at: NOW - 8 * MIN,      kind: 'text', text: '看到了，我重启下 CUPS，两分钟。' },
+  { seq: 417, peerId: 'b1f0c3d8-4a72-4c19-9f0e-7d2a5c8b1e34', peerLabel: 'Office Mac mini', direction: 'in',  at: NOW - 12 * MIN,     kind: 'text', text: '打印机又连不上了，你那边能看到吗？' },
+  { seq: 416, peerId: 'e40b7f12-9d6c-4a35-b7c2-8e1f4a6d0c93', peerLabel: 'Study iMac', direction: 'in',  at: NOW - (3 * HOUR + 5 * MIN), kind: 'text', text: '收到，晚点对一下时间戳' },
+  { seq: 415, peerId: 'e40b7f12-9d6c-4a35-b7c2-8e1f4a6d0c93', peerLabel: 'Study iMac', direction: 'out', at: NOW - 3 * HOUR,     kind: 'text', text: '日志我放桌面了，你解压看看' },
+  { seq: 414, peerId: '192.0.2.77', peerLabel: '192.0.2.77', direction: 'in', at: NOW - 26 * HOUR, kind: 'file', text: '' },
+];
+
+/* pending 是全局计数（TidingsHealthView.pending），不是每条会话各有一个 —— 所以它
+   只出现在横幅里。行内徽标那张图会画出不存在的数据，故意不画。 */
+const PENDING = 1;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   图标：照 TidingsIcon.tsx 的口径（24 viewBox、stroke、currentColor、1.6px）。
+   ══════════════════════════════════════════════════════════════════════════ */
+function svg(paths, size) {
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + paths + '</svg>';
+}
+const IC = {
+  tidings:  size => svg('<path d="M4 5.5h16v10H9.5L5 19v-3.5H4z"/><path d="M9.5 2.5c0 .8.9 1 .9 1.8"/><path d="M12.5 2.5c0 .8.9 1 .9 1.8"/>', size),
+  refresh:size => svg('<path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4.5V10h-5.5"/>', size),
+  dots:   size => svg('<circle cx="5.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="18.5" cy="12" r="1.4" fill="currentColor" stroke="none"/>', size),
+  search: size => svg('<circle cx="11" cy="11" r="6.2"/><path d="M15.6 15.6 20 20"/>', size),
+  back:   size => svg('<path d="M14.5 5.5 8 12l6.5 6.5"/>', size),
+  send:   size => svg('<path d="M4.5 12 20 5l-5.4 14-3.1-5.6z"/>', size),
+  /* 表情是这一排唯一能进列表的一项（详见 p-thread 的 annot）。
+     图标照茶话间 PantryIcon 的「smile」画，但这里不再配 PK / 猜拳 / 骰子 ——
+     那是人与人之间的娱乐，而这条会话的收件方是 agent。 */
+  smile:  size => svg('<circle cx="12" cy="12" r="8.2"/><path d="M8.4 14.3s1.3 1.8 3.6 1.8 3.6-1.8 3.6-1.8"/>'
+    + '<circle cx="9.2" cy="9.9" r="1" fill="currentColor" stroke="none"/><circle cx="14.8" cy="9.9" r="1" fill="currentColor" stroke="none"/>', size),
+  plus:   size => svg('<path d="M12 5v14"/><path d="M5 12h14"/>', size),
+  copy:   size => svg('<rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15 6.5V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15h1"/>', size),
+  gear:   size => svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-3-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.3-3l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 3 1.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>', size),
+  key:    size => svg('<circle cx="8" cy="12" r="3.2"/><path d="M11.2 12H20"/><path d="M17 12v3"/><path d="M20 12v2.2"/>', size),
+  shield: size => svg('<path d="M12 3.5 19 6v5.5c0 4.2-2.8 7-7 8.5-4.2-1.5-7-4.3-7-8.5V6z"/><path d="M9 12l2 2 4-4"/>', size),
+  alert:  size => svg('<circle cx="12" cy="12" r="8.2"/><path d="M12 8v4.6"/><circle cx="12" cy="15.8" r="1" fill="currentColor" stroke="none"/>', size),
+  check:  size => svg('<path d="M5 12.5 10 17.5 19 7"/>', size),
+  clock:  size => svg('<circle cx="12" cy="12" r="8.2"/><path d="M12 7.5V12l3 2"/>', size),
+  users:  size => svg('<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5c0-3 2.5-5.2 5.5-5.2s5.5 2.2 5.5 5.2"/><path d="M16 5.8a3.2 3.2 0 0 1 0 6.4"/><path d="M17.5 14.6c1.8.6 3 2.2 3 4.4"/>', size),
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   文案。凡 locales.ts 里已有的，逐字照抄；本稿新造的集中在 NEW_COPY 里，
+   README 有一张表。改稿时两边要一起改。
+   ══════════════════════════════════════════════════════════════════════════ */
+const NEW_COPY = ['更多', '返回', '搜索邻居或消息', '全部', '有消息', '未知对端', '未知', '新建消息', '加载更早的消息', '控制面设置', '重试', '发送结果', '待发', '要发送的节点还没选'];
+const T = {
+  panel: '捎话',
+  title: '捎话 · 局域网消息',
+  subtitle: '本机 agentNode 控制面',
+  online: '已连接', unreachable: '连不上', unauthorized: '需要令牌', error: '出错', unknown: '未知',
+  refresh: '刷新', retry: '重试', openSettings: '去设置', copy: '复制',
+  peersEmpty: '还没有邻居',
+  peersEmptyHint: '让对方把本机加为手动节点，或从本机先发一条消息过去；握手成功后这里就会出现。',
+  peekOnline: '在线', peekOffline: '离线', peekSelect: '发消息',
+  lastSeen: '最后活跃 {time}', never: '从未',
+  msgEmpty: '还没有消息', msgEmptyHint: '选中一个邻居发一条，或等对方先发过来。',
+  dirIn: '收', dirOut: '发', msgMore: '加载更早的消息', loading: '加载中…', nonText: '（非文本消息）',
+  composeTo: '发给', toPlaceholder: '邻居昵称或 IP，例如 192.0.2.5',
+  composePlaceholder: '说点什么…', send: '发送', sending: '发送中…',
+  composeEmoji: '插入表情',
+  /* 茶话间那句是「对方离线，无法发送图片/文件」，这里整句不成立：
+     tidings 只发文本，而文本离线照样排队。要说就说排队 —— 见 p-thread annot。 */
+  composeQueued: '对方离线，这条会排队等对方上线',
+  sent: '对方已收到（ACK）',
+  queued: '对方不在线，已入队，等它上线后自动补发 —— 这不代表对方已读',
+  composeHint: '回车发送，Shift+回车换行',
+  baseUrl: '控制面地址',
+  baseUrlHint: 'agentNode 的 HTTP 控制面，默认 http://127.0.0.1:8788',
+  timeoutMs: '超时（毫秒）', defaultPort: '默认 UDP 端口', inboxLimit: '每页消息数',
+  settingsSave: '保存设置',
+  settingsPath: '保存位置：{path}',
+  credTitle: '访问令牌',
+  credRef: '凭据名', credToken: '令牌',
+  credTokenPlaceholder: '粘贴令牌（保存后不再显示）',
+  credSave: '保存令牌', credClear: '清除令牌',
+  credConfigured: '已配置', credMissing: '未配置（本机回环默认不需要）',
+  credHint: '只有 agentNode 用 --token 启动时才需要。令牌只存在本机凭据库，页面不会回显它。',
+  credReadonly: '该凭据由外部来源提供，这里不能改写',
+  healthNodeId: '节点 ID', healthUptime: '运行时长',
+  errUnreachable: '连不上控制面。确认捎话桌面端正在运行并监听 127.0.0.1:8788。',
+  errUnauthorized: '控制面拒绝了请求：令牌缺失或不正确。',
+  errTimeout: '控制面响应超时。它可能正忙于握手，或地址填错了。',
+  errPeerUnreachable: '对方 3 秒内没回应握手。确认对方开着捎话、地址没写错、防火墙放行了 UDP 17878。',
+  bannerPending: (n) => '有 ' + n + ' 条消息还在等对方上线，会自动补发。',
+  bannerQueued: (to) => '发给 ' + to + ' 的消息已入队，等它上线后自动补发 —— 这不代表对方已读。',
+  bannerSent: (to) => to + ' 已收到（ACK）。',
+  bannerUnreadUnknown: '本机 1 个邻居从没握过手（节点 ID 还是它的地址），下面的名字因此是空的。',
+  countPeers: (p, o) => '邻居 ' + p + ' 个 · 在线 ' + o + ' 个',
+  chipAll: '全部', chipOnline: '在线', chipHasMsg: '有消息', chipUnknown: '未知对端',
+  unknownPeer: '未知（没握过手）',
+  menuMore: '更多', menuNew: '新建消息',
+  copyNodeId: '复制节点 ID', controlPlane: '控制面设置',
+  back: '返回', threadMessages: '消息', sendResult: '发送结果',
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   纯函数
+   ══════════════════════════════════════════════════════════════════════════ */
+function relTime(off) {
+  if (!off || off <= 0) return T.never;
+  const s = Math.max(0, Math.round(off / SEC));
+  if (s < 10) return '刚刚';
+  if (s < 60) return s + ' 秒前';
+  const m = Math.round(s / 60);
+  if (m < 60) return m + ' 分钟前';
+  const h = Math.round(m / 60);
+  if (h < 24) return h + ' 小时前';
+  return Math.round(h / 24) + ' 天前';
+}
+function uptimeText(ms) {
+  const s = Math.floor(ms / SEC), m = Math.floor(s / 60), h = Math.floor(m / 60);
+  if (h >= 1) return h + ' 小时 ' + (m % 60) + ' 分';
+  return m + ' 分钟';
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+/* peers × inbox 合成一条会话流。这是本稿唯一的取数动作，字段全部来自
+   TidingsPeerView / TidingsMessageView，没有新增来源。 */
+function conversations() {
+  const seen = {};
+  const out = PEERS.map(p => {
+    const mine = MSGS.filter(m => m.peerId === p.nodeId);
+    seen[p.nodeId] = true;
+    return {
+      id: p.nodeId, nick: p.nick, host: p.host, platform: p.platform,
+      online: p.online, lastSeen: p.lastSeen,
+      last: mine[0], count: mine.length,
+      unknownPeer: p.nodeId === p.host,
+    };
+  });
+  // 消息里出现过、但邻居表里没有的对端：也得占一行，不然消息就"消失"了
+  MSGS.forEach(m => {
+    if (seen[m.peerId]) return;
+    seen[m.peerId] = true;
+    out.push({
+      id: m.peerId, nick: '', host: m.peerId, platform: '', online: false,
+      lastSeen: 0, last: m, count: MSGS.filter(x => x.peerId === m.peerId).length,
+      unknownPeer: true,
+    });
+  });
+  // 排序键：最近一条消息的时间；没有消息的退到 lastSeen。
+  out.forEach(c => { c.activity = c.last ? c.last.at : c.lastSeen; });
+  out.sort((a, b) => b.activity - a.activity);
+  return out;
+}
+function msgsOf(id) { return MSGS.filter(m => m.peerId === id); }
+function preview(c) {
+  if (!c.last) return '<span class="l2" style="color:var(--dsw-alias-label-caption)">' + T.msgEmpty + '</span>';
+  const d = '<span class="dir">' + (c.last.direction === 'out' ? T.dirOut : T.dirIn) + '</span>';
+  const t = c.last.text ? esc(c.last.text) : T.nonText;
+  return '<span class="l2">' + d + '<span class="pre">' + t + '</span></span>';
+}
+function initial(nick) { return nick ? nick.trim().charAt(0) : '?'; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   外壳：DSH 侧栏 + 面板槽位。侧栏在真实产品里属于 ui-sidebar，面板只是挂在
+   main 槽里的一个 occupant（client/index.ts:63-68）；这里画它只为给出上下文。
+   ══════════════════════════════════════════════════════════════════════════ */
+function sidebar() {
+  return '<aside class="side">'
+    + '<div class="sbrand"><span class="smark">D</span><span class="sname">DeepSeek Harness</span></div>'
+    + '<div class="swire">外壳的其他面板与会话列表<br><i>不是本插件的内容，这里只是占位</i></div>'
+    + '<nav class="spanels"><button class="srow on">' + IC.tidings(18) + '<span>捎话</span></button></nav>'
+    + '<div class="sfoot"><span class="sdot"></span><span class="sdot"></span></div>'
+    + '</aside>';
+}
+function device(screenId, formId) {
+  const f = FORM[formId] || FORM['wide-dark'];
+  const narrow = f.w - f.side < 560;
+  const attrs = ' class="win" style="width:' + f.w + 'px;height:' + f.h + 'px;grid-template-columns:' + f.side + 'px 1fr"'
+    + (f.theme === 'dark' ? ' data-ds-dark-theme=""' : '')
+    + (f.side <= 56 ? ' data-collapsed=""' : '')
+    + (narrow ? ' data-narrow=""' : '');
+  const render = SCREENFN[screenId] || (() => '<div class="panel"><div class="pwrap"><p class="hint">没有这一屏</p></div></div>');
+  return '<div' + attrs + '>' + sidebar() + '<main class="main">' + render() + '</main></div>';
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   公共片段
+   ══════════════════════════════════════════════════════════════════════════ */
+function phead(state, extra) {
+  const tone = state === 'online' ? 't-ok' : state === 'unauthorized' ? 't-warn' : state === 'unknown' ? 't-idle' : 't-err';
+  const label = state === 'online' ? T.online : state === 'unauthorized' ? T.unauthorized : state === 'unknown' ? T.unknown : T.unreachable;
+  return '<header class="phead">'
+    + '<h1 class="ptitle">' + T.title + '</h1>'
+    + '<span class="badge ' + tone + '">' + label + '</span>'
+    + '<span class="grow"></span>'
+    + (extra || '')
+    + '<button class="btn icon" aria-label="' + T.refresh + '">' + IC.refresh(16) + '</button>'
+    + '<button class="btn icon" aria-label="' + T.menuMore + '" aria-haspopup="menu">' + IC.dots(16) + '</button>'
+    + '</header>'
+    + '<p class="psub">' + T.subtitle + '</p>';
+}
+function nodebar() {
+  return '<div class="nodebar">'
+    + '<span class="led"></span>'
+    + '<span>' + T.countPeers(HEALTH.peers, HEALTH.online) + '</span>'
+    + '<span class="dim">·</span>'
+    + '<span class="dim">' + esc(HEALTH.nick) + ' · ' + esc(HEALTH.platform) + ' · ' + T.healthUptime + ' ' + uptimeText(HEALTH.uptimeMs) + '</span>'
+    + '<span class="grow"></span>'
+    + '<span class="mono dim">' + T.healthNodeId + ' ' + HEALTH.nodeId.slice(0, 8) + '…' + HEALTH.nodeId.slice(-4) + '</span>'
+    + '</div>';
+}
+function searchbar(q) {
+  return '<div class="search">' + IC.search(16)
+    + '<span class="ph' + (q ? ' filled' : '') + '">' + (q ? esc(q) : '搜索邻居或消息') + '</span></div>';
+}
+function chips(active, counts) {
+  const defs = [['all', T.chipAll], ['online', T.chipOnline], ['hasmsg', T.chipHasMsg], ['unknown', T.chipUnknown]];
+  return '<div class="chips">' + defs.map(d => {
+    const on = d[0] === active;
+    return '<button class="chip' + (on ? ' on' : '') + '"' + (on ? ' aria-pressed="true"' : '') + '>'
+      + d[1] + '<b>' + counts[d[0]] + '</b></button>';
+  }).join('') + '</div>';
+}
+function crow(c, current) {
+  const sub = c.nick ? esc(c.nick) : '<span class="cnick unknown">' + T.unknownPeer + '</span>';
+  /* 时间只在 l1 里画一次。上一版在行尾另开了一列 `.cmeta` 再画一遍，
+     结果是每行右侧两个一模一样的时间。 */
+  return '<button class="crow"' + (current ? ' aria-current="true"' : '') + '>'
+    + '<span class="av"' + (c.online ? ' data-online=""' : '') + '>'
+    + '<span class="avc">' + esc(initial(c.nick)) + '</span>'
+    + '<span class="avb ' + (c.online ? 'on' : 'off') + '"></span></span>'
+    + '<span class="cbody">'
+    + '<span class="l1">' + (c.nick ? '<span class="cnick">' + esc(c.nick) + '</span>' : sub)
+    + '<span class="ctime">' + relTime(NOW - c.activity) + '</span></span>'
+    + preview(c)
+    + '</span>'
+    + '</button>';
+}
+function annot(html) {
+  return '<div class="annot"><span class="tag">设计注释</span>' + html + '</div>';
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   屏
+   ══════════════════════════════════════════════════════════════════════════ */
+const CONV = conversations();
+const COUNTS = {
+  all: CONV.length,
+  online: CONV.filter(c => c.online).length,
+  hasmsg: CONV.filter(c => c.count > 0).length,
+  unknown: CONV.filter(c => c.unknownPeer).length,
+};
+
+/* ── 最近会话（提案的默认落点） ── */
+SCREENFN['p-home'] = function () {
+  return '<div class="panel"><div class="pwrap">'
+    + phead('online')
+    + nodebar()
+    + (PENDING ? '<div class="banner">' + IC.clock(15) + '<span>' + T.bannerPending(PENDING) + '</span></div>' : '')
+    + searchbar('')
+    + chips('all', COUNTS)
+    + '<div class="scroll"><div class="rows">' + CONV.map(c => crow(c)).join('') + '</div>'
+    + annot(
+      '<p><b>这一屏把两个页签并成一条流。</b>现状是三个页签「邻居 / 消息 / 设置」'
+      + '（<code>已删除的原 TidingsPanel.tsx</code>），同一个对端会在「邻居」和「消息」里各出现一次，'
+      + '回答不了「和 Pixel 6 到底聊到哪了」。</p>'
+      + '<p>合并之后一条会话 = 一个 <code>TidingsPeerView</code>（<code>model.ts:73-84</code>）'
+      + '加上按 <code>peerId</code> 归到它名下的 <code>TidingsMessageView</code>'
+      + '（<code>model.ts:87-98</code>）。<b>没有消息的邻居也占一行</b>（第 5 行 iPad Air）——'
+      + '「这个人现在在线」本身就是信息，藏进另一个页签就是丢了。</p>'
+      + '<p><b>排序键是「最近活动」</b>：有消息取最后一条的时间，没消息退到 <code>lastSeen</code>。'
+      + '代价和 App 侧那条提案一样 —— <b>在线的人会下沉</b>：Pixel 6 在线、30 秒前说过话排第一，'
+      + '而Study iMac 离线 3 小时，靠一条消息排在离线更久的 iPad Air 前面。'
+      + '要不要把「在线」当同权的次级条件加回来，是这里唯一要拍板的取舍。</p>'
+      + '<p><b>第 4 行不是 bug，是要顺手补的缺口。</b>它的 <code>nodeId</code> 退回了 host authority'
+      + '（<code>model.ts:74</code> 的注释：never handshook），<code>nick</code> 是空串，'
+      + '而面板现在直接渲染 <code>peer.nick</code>（<code>已删除的原 TidingsPanel.tsx</code>）——'
+      + '空串会渲染成一片空白，连"这是什么"都看不出来。这里画成「未知（没握过手）」，'
+      + '建议实现时照这条改。</p>'
+      + '<p><b>没有画行内「待发 1」徽标</b>，因为那个数不在数据里：'
+      + '<code>pending</code> 是节点级的全局队列长度（<code>model.ts:68</code>），'
+      + '不是每条会话各有一个。它只出现在上面那条横幅里 —— 画到行上就是假数据。</p>'
+    )
+    + '</div></div>';
+};
+
+/* ── 还没有邻居 ── */
+SCREENFN['p-home-empty'] = function () {
+  return '<div class="panel"><div class="pwrap">'
+    + phead('online')
+    + nodebar().replace('邻居 5 个 · 在线 2 个', '邻居 0 个 · 在线 0 个')
+    + searchbar('')
+    + '<div class="scroll"><div class="empty"><span class="et">' + T.peersEmpty + '</span>'
+    + '<span class="eh">' + T.peersEmptyHint + '</span>'
+    + '<button class="btn outline" style="margin-top:6px">' + IC.plus(14) + T.openSettings + '</button></div>'
+    + annot(
+      '<p>文案全部照抄 <code>locales.ts</code> 的 <code>peers.empty</code> / <code>peers.emptyHint</code>，'
+      + '一个字没改 —— 那句话已经把两条来路（对方加你 / 你先发过去）说全了。</p>'
+      + '<p>加了「去设置」是因为空态里最可能的下一步是去改控制面地址：'
+      + '现在这个键 <code>action.openSettings</code> <b>定义了但从来没渲染过</b>'
+      + '（<code>locales.ts:28</code>，全仓 0 处引用）。</p>'
+    )
+    + '</div></div>';
+};
+
+/* ── 过滤 ── */
+SCREENFN['p-home-filter'] = function () {
+  const only = CONV.filter(c => c.count > 0);
+  return '<div class="panel"><div class="pwrap">'
+    + phead('online')
+    + nodebar()
+    + searchbar('打印机')
+    + chips('hasmsg', COUNTS)
+    + '<div class="scroll"><div class="rows">' + only.map(c => crow(c)).join('') + '</div>'
+    + annot(
+      '<p><b>三条过滤轴的取值全部来自现有字段</b>，没有新的取数：'
+      + '「在线」= <code>peer.online</code>；「有消息」= inbox 里出现过这个 <code>peerId</code>；'
+      + '「未知对端」= <code>nodeId === host</code>（就是上面那个没握过手的）。</p>'
+      + '<p><b>过滤不进右上角的菜单。</b>菜单里的东西是看不见的，而「现在看的是不是全部会话」'
+      + '必须一眼可见 —— 所以这里是常驻的一排药丸，计数写在药丸里。</p>'
+      + '<p>搜索框与过滤条是两条正交的轴：搜索按内容筛（这里搜「打印机」），'
+      + '药丸按种类筛，叠起来就是「搜我有消息的会话」。'
+      + '现状面板<b>既没有搜索也没有过滤</b>，连 <code>messages.more</code> 都还没接上。</p>'
+    )
+    + '</div></div>';
+};
+
+/* ── 更多菜单 ── */
+SCREENFN['p-more'] = function () {
+  const base = SCREENFN['p-home']();
+  const menu = '<div class="menu" style="top:78px;right:20px">'
+    + '<button class="mitem">' + IC.plus(16) + '<span>' + T.menuNew + '</span></button>'
+    + '<button class="mitem">' + IC.copy(16) + '<span>' + T.copyNodeId + '</span></button>'
+    + '<div class="msep"></div>'
+    + '<button class="mitem">' + IC.gear(16) + '<span>' + T.controlPlane + '</span></button>'
+    + '<button class="mitem">' + IC.key(16) + '<span>' + T.credTitle + '</span></button>'
+    + '</div>';
+  return base.replace('<div class="pwrap">', '<div class="pwrap" style="position:relative">') + menu + '</div>';
+};
+
+/* ── 对话详情 ── */
+function thread(sid, opts) {
+  const c = CONV.filter(x => x.id === sid)[0];
+  const list = msgsOf(c.id);
+  const banner = opts.banner || '';
+  return '<div class="panel"><div class="pwrap">'
+    + '<header class="thead">'
+    + '<button class="btn icon" aria-label="' + T.back + '">' + IC.back(16) + '</button>'
+    + '<span class="av"' + (c.online ? ' data-online=""' : '') + ' style="width:32px;height:32px">'
+    + '<span class="avc" style="width:32px;height:32px;font-size:13px">' + esc(initial(c.nick)) + '</span>'
+    + '<span class="avb ' + (c.online ? 'on' : 'off') + '"></span></span>'
+    + '<span class="tpeer"><span class="tname">' + (c.nick ? esc(c.nick) : T.unknownPeer) + '</span>'
+    + '<span class="dim">' + esc(c.host) + (c.unknownPeer ? '' : ' · ' + esc(c.platform)) + ' · ' + T.lastSeen.replace('{time}', relTime(NOW - c.lastSeen)) + '</span></span>'
+    + '<span class="grow"></span>'
+    + '<span class="badge ' + (c.online ? 't-ok' : 't-idle') + '">' + (c.online ? T.peekOnline : T.peekOffline) + '</span>'
+    + '</header>'
+    + (list.length > 1 ? '<button class="btn ghost" style="align-self:center">' + T.msgMore + '</button>' : '')
+    + banner
+    + '<div class="msgs">'
+    + (list.length === 0
+      ? '<div class="empty"><span class="et">' + T.msgEmpty + '</span><span class="eh">' + T.msgEmptyHint + '</span></div>'
+      : list.slice().reverse().map(m =>
+        '<div class="msg ' + m.direction + '"><span class="who">'
+        + '<span class="wfrom">' + (m.direction === 'out' ? T.dirOut : T.dirIn) + ' · '
+        + (m.peerLabel ? esc(m.peerLabel) : T.unknownPeer) + '</span>'
+        + '<span class="wtime">' + relTime(NOW - m.at) + '</span>'
+        + '</span><span class="txt">' + (m.text ? esc(m.text) : T.nonText) + '</span></div>').join(''))
+    + '</div>'
+    + annot(opts.note)
+    + '<div class="composer">'
+    + '<div class="toolbar">'
+    + '<span class="tool"><button class="tool" type="button" aria-label="' + T.composeEmoji + '">' + IC.smile(18) + '</button></span>'
+    + '<span class="tool-hint">' + T.composeQueued + '</span>'
+    + '</div>'
+    + '<span class="ta' + (opts.draft ? '' : ' ph') + '">' + (opts.draft ? esc(opts.draft) : T.composePlaceholder) + '</span>'
+    + '<div class="comrow">'
+    + '<button class="btn primary md"' + (opts.draft ? '' : ' disabled') + '>' + IC.send(15) + T.send + '</button>'
+    + '<span class="hint">' + T.composeHint + '</span>'
+    + '</div></div>'
+    + '</div></div>';
+}
+SCREENFN['p-thread'] = function () {
+  return thread('b1f0c3d8-4a72-4c19-9f0e-7d2a5c8b1e34', {
+    note:
+      '<p><b>收件人在这一屏是固定的，所以不再出现那个「发给」输入框。</b>'
+      + '现状把收件人和消息流挤在同一页（<code>已删除的原 TidingsPanel.tsx</code>）：'
+      + '每换一个对端都要手打一次地址，而地址你刚刚才在邻居页看过。'
+      + '手动填收件人的入口搬到<b>更多 → 新建消息</b>，只在没有会话时用。</p>'
+      + '<p>发件人/收件人的身份在气泡上方一行小字里（<code>messages.in</code> / '
+      + '<code>messages.out</code>），不靠左右位置单独承担 —— 现在那行也在，'
+      + '但收件人得自己记住。</p>'
+      + '<p>顶部保留了邻居的<b>地址、平台、最后活跃</b>（原来只在邻居页能给），'
+      + '因为「发出去没回」的第一反应是去看它到底还在不在线。</p>'
+      + '<p><b>输入区那排图标只放了一个表情，不是照茶话间抄六项。</b>'
+      + '茶话间那排是 表情 · PK(猜拳/骰子) · 窗口震动 · 截图 · 图片 · 文件 · 文件夹，'
+      + '这里只留表情。三条拦下来的理由，第一条是硬边界，后两条是产品判断：</p>'
+      + '<p>① <b>控制面只收文本。</b><code>/v1/send</code> 发的是 <code>{to, text}</code>'
+      + '（<code>tidings.ts:345</code>），连 <code>kind</code> 字段都不带 —— 图片/文件现在'
+      + '根本没有落点，要落地得先让 agentNode 加 blob 通道；在此之前画出来就是'
+      + '「按下去没反应」，正是 <code>MessageComposer.kt:69-71</code> 点名的那件事。'
+      + '② 截图要碰屏幕、图片要读本地路径，而面板跑在浏览器半边，这两件它都拿不到，'
+      + '硬画只能是一排永远灰的图标。③ PK / 猜拳 / 骰子 / 窗口震动是<b>人与人之间</b>的娱乐，'
+      + '这条会话的收件方是 agent —— 把它塞进命令行面板是错的产品定位，'
+      + '和「功能提了但不在这里」属于同一类问题：用户会以为自己没按对。</p>'
+      + '<p><b>那句提示也跟着翻了个面。</b>茶话间写「对方离线，无法发送图片/文件」，'
+      + '这里写「对方离线，这条会排队等对方上线」。同一件事，一个说发不了、一个说会排队，'
+      + '因为两边能发的东西不一样：茶话间失去的是图片/文件（它们依赖在线），'
+      + 'Tidings 失去的什么都没有 —— 文本离线照样入队，'
+      + '排队这件事在 <code>p-thread-queued</code> 那屏钉在会话里，不靠这一行字承担。</p>'
+  });
+};
+SCREENFN['p-thread-empty'] = function () {
+  return thread('a93b0f54-7c81-4e6d-90ab-2d5f8c1e7b40', {
+    note:
+      '<p><b>从没聊过的邻居点进来就是这一屏。</b>文案照抄 <code>messages.empty</code> / '
+      + '<code>messages.emptyHint</code>。这条会话在列表里也是「还没有消息」那一行 —— '
+      + '点开之后是同一个答案，不是两个不同的空。</p>'
+      + '<p>发送按钮在没写内容时置灰（<code>compose.needText</code> 那条校验的视觉面）；'
+      + '写下去才亮。现在这条校验只在点下去之后才以飘字的形式出现。</p>'
+  });
+};
+SCREENFN['p-thread-queued'] = function () {
+  return thread('e40b7f12-9d6c-4a35-b7c2-8e1f4a6d0c93', {
+    draft: '桌面那份对完了，两个时间戳差 40 秒，你看下是不是 NTP 没对齐',
+    banner: '<div class="banner">' + IC.clock(15) + '<span>' + T.bannerQueued('Study iMac') + '</span></div>',
+    note:
+      '<p><b>这一段是全稿最重要的一处。</b>「queued 不等于已读」是这个产品最容易被误解的事'
+      + '（插件 README 专门用一整段写它），但现状只把它放在一句飘字里'
+      + '（<code>compose.queued</code>，<code>已删除的原 TidingsPanel.tsx</code>），'
+      + '飘完就没了。这里把它钉在会话里，直到对方上线 ACK。</p>'
+      + '<p>对照另一条成功路径：在线对端发出去是 <code>compose.sent</code>'
+      + '（「对方已收到（ACK）」），绿色；两条文案分开，不共用一句「发送成功」。</p>'
+      + '<p>对方离线时头像右下角是灰点、顶栏是「离线」徽标 —— 发出去之前就该知道'
+      + '这条会入队，而不是发完了才被告知。</p>'
+  });
+};
+SCREENFN['p-compose'] = function () {
+  return '<div class="panel"><div class="pwrap">'
+    + '<header class="thead">'
+    + '<button class="btn icon" aria-label="' + T.back + '">' + IC.back(16) + '</button>'
+    + '<span class="tname">' + T.menuNew + '</span>'
+    + '</header>'
+    + '<div class="card">'
+    + '<div class="field"><span class="flabel">' + T.composeTo + '</span>'
+    + '<span class="inp focus">192.0.2.77</span></div>'
+    + '<p class="hint">' + T.toPlaceholder + '</p>'
+    + '<div class="field"><span class="flabel">' + T.composePlaceholder + '</span>'
+    + '<span class="inp ph" style="height:64px;align-items:flex-start;padding:7px 8px">说点什么…</span></div>'
+    + '<div class="comrow"><button class="btn primary md">' + IC.send(15) + T.send + '</button>'
+    + '<span class="hint">' + T.composeHint + '</span></div>'
+    + '</div>'
+    + annot(
+      '<p><b>这条路只在两种时候走：</b>对方还没成为邻居（例如你知道 IP 但没握过手），'
+      + '或者你要主动开一个新会话。<code>compose.to</code> / <code>compose.toPlaceholder</code> '
+      + '照抄原文案，收件人接受「邻居昵称或 IP」两种写法。</p>'
+      + '<p>写 IP 时 agentNode 会先发 <code>entry</code> 握手、最多等 3 秒，'
+      + '握不上返回 <code>peer-unreachable</code>，不会静默入队 —— '
+      + '错误文案 <code>error.peer-unreachable</code> 已经写得很清楚，'
+      + '这里不重复，出错时在发送按钮下方出现。</p>'
+      + '<p>「未知对端」那一行点进来的也是这一屏：它的 <code>id</code> 就是地址，'
+      + '直接预填好，用户不用去别处复制。</p>'
+    )
+    + '</div></div>';
+};
+
+/* ── 连不上 ── */
+SCREENFN['p-unreachable'] = function () {
+  return '<div class="panel"><div class="pwrap">'
+    + phead('unreachable')
+    + '<div class="card" style="gap:10px">'
+    + '<div class="sechead"><span class="badge t-err">' + T.unreachable + '</span></div>'
+    + '<p class="hint" style="font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary)">' + T.errUnreachable + '</p>'
+    + '<p class="hint">' + T.baseUrlHint + '</p>'
+    + '<div class="comrow"><button class="btn outline">' + IC.refresh(14) + T.retry + '</button>'
+    + '<button class="btn ghost">' + T.controlPlane + '</button></div>'
+    + '</div>'
+    + annot(
+      '<p>文案照抄 <code>error.unreachable</code>（<code>locales.ts:100</code>）—— '
+      + '它已经把那条 <code>agentNode --http-port 8788</code> 启动命令写进句子里了，'
+      + '这是本插件最常被撞到的一次失败，不该只给一句「连接失败」。</p>'
+      + '<p>三个东西必须同时在场：<b>原因</b>（连不上）、<b>怎么修</b>（那条命令）、'
+      + '<b>重试</b>。现状的形状是对的（<code>已删除的原 TidingsPanel.tsx</code>），'
+      + '这一屏只是补上「控制面设置」这个直达入口 —— 半数组网问题最后要落到改地址上，'
+      + '而现在得先想办法摸到设置页。</p>'
+      + '<p>这一屏也说明<b>三页签被并掉之后没有丢功能</b>：设置本来就是从页签进的，'
+      + '现在从右上角菜单进，且在错误屏里就地可达。</p>'
+    )
+    + '</div></div>';
+};
+
+/* ── 需要令牌 ── */
+SCREENFN['p-unauthorized'] = function () {
+  return '<div class="panel"><div class="pwrap">'
+    + phead('unauthorized')
+    + '<div class="card" style="gap:10px">'
+    + '<div class="sechead"><span class="badge t-warn">' + T.unauthorized + '</span>'
+    + '<span class="grow"></span><span class="badge t-warn">' + T.credMissing + '</span></div>'
+    + '<p class="hint" style="font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary)">' + T.errUnauthorized + '</p>'
+    + '<p class="hint">' + T.credHint + '</p>'
+    + '<div class="field"><span class="flabel">' + T.credToken + '</span>'
+    + '<span class="inp ph">' + T.credTokenPlaceholder + '</span></div>'
+    + '<div class="comrow"><button class="btn primary md" disabled>' + T.credSave + '</button>'
+    + '<button class="btn outline md" disabled>' + T.credClear + '</button>'
+    + '<span class="grow"></span><button class="btn ghost">' + T.retry + '</button></div>'
+    + '</div>'
+    + annot(
+      '<p><b>令牌录入不该藏在设置里等你去翻。</b>控制面返回 <code>unauthorized</code> 的时候'
+      + '（<code>model.ts:157</code>），唯一能解除它的动作就是把令牌填进去 —— '
+      + '那就把这个表单项就地画在错误说明下面，不用先找到设置页。</p>'
+      + '<p>按钮置灰用的是现有校验：<code>saveToken</code> 的条件是'
+      + '<code>tokenDraft.length === 0</code>（<code>已删除的原 TidingsPanel.tsx</code>）→ 空输入时不可点。'
+      + '「清除」在 <code>credential.configured !== true</code> 时同样置灰，与现状一致。</p>'
+      + '<p>令牌值<b>不回显</b>（<code>type=password</code> + 保存后立刻清空组件状态，'
+      + '<code>已删除的原 TidingsPanel.tsx</code>），这一屏用占位文案表达这件事，'
+      + '而不是画一排圆点假装里面有值。</p>'
+    )
+    + '</div></div>';
+};
+
+/* ── 加载中 ── */
+SCREENFN['p-loading'] = function () {
+  const sk = (w, h) => '<div class="sk" style="width:' + w + ';height:' + h + 'px"></div>';
+  let rows = '';
+  for (let i = 0; i < 4; i++) {
+    rows += '<div class="crow" style="cursor:default">'
+      + '<span class="av"><span class="sk" style="width:38px;height:38px;border-radius:10px"></span></span>'
+      + '<span class="cbody" style="gap:6px">' + sk('31%', '14px') + sk((58 + i * 9) + '%', '12px') + '</span>'
+      + sk('40px', '12px') + '</div>';
+  }
+  return '<div class="panel"><div class="pwrap">'
+    + phead('unknown')
+    + '<div class="nodebar"><span class="sk" style="width:7px;height:7px;border-radius:99px"></span>'
+    + '<div class="sk" style="width:190px;height:13px"></div>'
+    + '<span class="grow"></span><div class="sk" style="width:120px;height:12px"></div></div>'
+    + searchbar('')
+    + '<div class="scroll"><div class="rows">' + rows + '</div>'
+    + annot(
+      '<p>面板第一次打开、或点刷新时，<code>refresh()</code> 是<b>串行两跳</b>：'
+      + '先 <code>status</code>，在线才并发 <code>peers</code> + <code>inbox</code>'
+      + '（<code>已删除的原 TidingsPanel.tsx</code>）。这中间有真实的一段空窗，'
+      + '现状只用一句「加载中…」（<code>messages.loading</code>）填，'
+      + '页面会整体跳一下。</p>'
+      + '<p>骨架屏把<b>即将出现的那几个东西的形状</b>先摆好：节点条、搜索框、四行会话。'
+      + '这不是美化 —— 控制面在回环上通常几十毫秒就回来了，慢的是 agentNode 刚起、'
+      + '正在做 mDNS 发现的那段时间，那时候用户正盯着空白决定要不要去查日志。</p>'
+    )
+    + '</div></div>';
+};
+
+/* ── 设置 ── */
+SCREENFN['p-settings'] = function () {
+  return '<div class="panel"><div class="pwrap">'
+    + '<header class="thead">'
+    + '<button class="btn icon" aria-label="' + T.back + '">' + IC.back(16) + '</button>'
+    + '<span class="tname">' + T.controlPlane + '</span>'
+    + '<span class="grow"></span>'
+    + '<span class="badge t-ok">' + T.online + '</span>'
+    + '</header>'
+    + '<div class="card">'
+    + '<div class="sechead"><span class="sectitle">' + T.controlPlane + '</span>'
+    + '<span class="grow"></span><span class="hint">' + T.settingsPath.replace('{path}', '$DSH_HOME/tidings/config-v1.json') + '</span></div>'
+    + '<div class="field"><span class="flabel">' + T.baseUrl + '</span><span class="inp">http://127.0.0.1:8788</span></div>'
+    + '<p class="hint">' + T.baseUrlHint + '</p>'
+    + '<div class="grid3">'
+    + '<div class="field"><span class="flabel">' + T.timeoutMs + '</span><span class="inp">3000</span></div>'
+    + '<div class="field"><span class="flabel">' + T.defaultPort + '</span><span class="inp">17878</span></div>'
+    + '<div class="field"><span class="flabel">' + T.inboxLimit + '</span><span class="inp">30</span></div>'
+    + '</div>'
+    + '<div class="comrow"><button class="btn primary md">' + T.settingsSave + '</button></div>'
+    + '</div>'
+    + '<div class="card">'
+    + '<div class="sechead"><span class="sectitle">' + T.credTitle + '</span>'
+    + '<span class="grow"></span><span class="badge t-ok">' + T.credConfigured + '</span></div>'
+    + '<p class="hint">' + T.credHint + '</p>'
+    + '<div class="field"><span class="flabel">' + T.credRef + '</span><span class="inp">TIDINGS_AGENT_TOKEN</span></div>'
+    + '<div class="comrow"><button class="btn ghost">' + T.credTitle + ' →</button></div>'
+    + '</div>'
+    + annot(
+      '<p><b>把「控制面设置」和「访问令牌」拆成两层。</b>前者是随时可能改的取数参数，'
+      + '后者是一次性录入、录入之后基本不再看的东西 —— 现状把它们堆在同一页'
+      + '（<code>已删除的原 TidingsPanel.tsx</code>），令牌那两张卡的输入框比设置本身还抢眼。</p>'
+      + '<p>四个数值字段全部照抄现有键：<code>settings.baseUrl</code> / '
+      + '<code>settings.timeoutMs</code> / <code>settings.defaultPort</code> / '
+      + '<code>settings.inboxLimit</code>。落盘位置走 <code>settings.path</code>'
+      + '（<code>{path}</code> 占位），让用户知道改完去哪找。</p>'
+      + '<p>「访问令牌」在这里只是一个入口 + 一个状态徽标，点进去才是录入界面。</p>'
+    )
+    + '</div></div>';
+};
+
+/* ── 访问令牌 ── */
+SCREENFN['p-credential'] = function () {
+  return '<div class="panel"><div class="pwrap">'
+    + '<header class="thead">'
+    + '<button class="btn icon" aria-label="' + T.back + '">' + IC.back(16) + '</button>'
+    + '<span class="tname">' + T.credTitle + '</span>'
+    + '</header>'
+    + '<div class="card">'
+    + '<div class="sechead"><span class="badge t-ok">' + T.credConfigured + '</span>'
+    + '<span class="hint">本机凭据库 · 页面不回显</span></div>'
+    + '<p class="hint">' + T.credHint + '</p>'
+    + '<div class="field"><span class="flabel">' + T.credRef + '</span><span class="inp">TIDINGS_AGENT_TOKEN</span></div>'
+    + '<div class="field"><span class="flabel">' + T.credToken + '</span><span class="inp ph">' + T.credTokenPlaceholder + '</span></div>'
+    + '<div class="comrow"><button class="btn primary md" disabled>' + T.credSave + '</button>'
+    + '<button class="btn outline md">' + T.credClear + '</button></div>'
+    + '</div>'
+    + '<div class="card">'
+    + '<div class="sechead"><span class="sectitle">' + T.credReadonly.split('，')[0] + '</span>'
+    + '<span class="badge t-idle">只读</span></div>'
+    + '<p class="hint">' + T.credReadonly + '</p>'
+    + '</div>'
+    + annot(
+      '<p><b>三个状态各自可见</b>，这是 <code>TidingsCredentialView</code> 已经提供的：'
+      + '<code>configured</code>（已配置 / 未配置，<code>model.ts:145-147</code>）、'
+      + '<code>writable</code>（不可写时输入框与两个按钮都置灰，'
+      + '<code>已删除的原 TidingsPanel.tsx</code>）、'
+      + '<code>source</code>（有外部来源时给一句 <code>credential.readonly</code>，'
+      + '<code>已删除的原 TidingsPanel.tsx</code>）。</p>'
+      + '<p>第二张卡就是 <code>writable === false</code> 那张脸：令牌由环境变量一类的外部来源提供，'
+      + '这里只能看不能改。现状也画了，但埋在设置页最底下、和另外两张卡连着，'
+      + '很容易被当成"这里坏了"。</p>'
+      + '<p>「保存令牌」在没输入时置灰 —— 校验条件照抄现状'
+      + '（<code>tokenDraft.length === 0</code>）。</p>'
+    )
+    + '</div></div>';
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   渲染入口
+   两种模式：
+     · 带 ?screen=…&size=…&theme=…  → 只画那一个窗口，正好是窗口大小（截图用）
+     · 否则                          → 控制条 + 画廊
+   ══════════════════════════════════════════════════════════════════════════ */
+function qs(name) {
+  const m = new RegExp('[?&]' + name + '=([^&#]*)').exec(location.search);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function galleryCell(sid, fid) {
+  const f = FORM[fid];
+  const k = Math.min(0.30, 1180 / f.w);
+  const w = Math.round(f.w * k), h = Math.round(f.h * k);
+  const s = SCREENS.filter(x => x.id === sid)[0];
+  return '<figure class="gcell" style="width:' + w + 'px">'
+    + '<div class="gwin" style="width:' + w + 'px;height:' + h + 'px">'
+    + '<div class="gsc" style="width:' + f.w + 'px;height:' + f.h + 'px;transform:scale(' + k + ')">'
+    + device(sid, fid) + '</div></div>'
+    + '<figcaption>' + s.label + '<i>' + f.label + '</i></figcaption>'
+    + '</figure>';
+}
+function render() {
+  const root = document.getElementById('root');
+  const sid = qs('screen');
+  if (sid) {
+    const fid = qs('size') || 'wide-dark';
+    const f = FORM[fid] || FORM['wide-dark'];
+    const theme = qs('theme');
+    const useForm = theme && theme !== f.theme
+      ? (FORMS.filter(x => x.theme === theme && x.side === f.side)[0] || f).id
+      : fid;
+    document.body.style.background = 'transparent';
+    const st = document.createElement('div');
+    st.className = 'stage shot';
+    st.innerHTML = device(sid, useForm);
+    root.appendChild(st);
+    return;
+  }
+  const opts = SCREENS.map(s => '<button class="ctlchip" data-screen="' + s.id + '">' + s.label + '</button>').join('');
+  const fopts = FORMS.map(f => '<button class="ctlchip" data-form="' + f.id + '">' + f.label + '</button>').join('');
+  root.innerHTML =
+    '<div class="ctl">'
+    + '<div class="ctlrow"><b>形态</b>' + fopts
+    + '<span class="ctlhint">侧栏宽度取 columns.ts：280 展开 / 56 收起（视口 &lt;1024 自动收起）</span></div>'
+    + '<div class="ctlrow"><b>屏</b>' + opts + '</div>'
+    + '</div>'
+    + '<div class="gallery" id="g">' + GALLERY.map(g => galleryCell(g[0], g[1])).join('') + '</div>';
+  const g = document.getElementById('g');
+  g.addEventListener('click', (e) => {
+    const cell = e.target.closest('.gcell');
+    if (!cell) return;
+    const cap = cell.querySelector('figcaption');
+    const s = SCREENS.filter(x => x.label === cap.childNodes[0].nodeValue)[0];
+    const f = FORMS.filter(x => x.label === cap.querySelector('i').textContent)[0];
+    if (s && f) location.search = '?screen=' + s.id + '&size=' + f.id + '&theme=' + f.theme;
+  });
+}
+render();
+</script>
+</body>
+</html>
