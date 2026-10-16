@@ -1,0 +1,15 @@
+# 只盯构建工具链的 minor/patch 漂移；运行时依赖是 peer + 宿主提供，
+# 自动 bump 会在「装插件」这一步制造不可复现的失败。
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-type: development
+    versioning-strategy: increase-if-necessary

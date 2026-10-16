@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: MIT
+#
+# CI 跑的就是 README 承诺的那一条：pnpm run check。
+# 一个字都不多 —— 七条门禁与 typecheck 全部本地可复现，CI 只负责
+# 「没人记得跑」这一种失败。check:real 不在这里：它需要一个活的
+# agentNode，runner 上没有，那是本地/真机验收层（README §开发）。
+
+name: check
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+# 同一分支的新推送取消上一次：门禁幂等，没必要跑过期的提交。
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # 版本不钉死：package.json 未声明 packageManager，交给 action 取最新 v10，
+        # 锁文件由 pnpm 10 生成，兼容。
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          # 与 package.json engines 的低端一致（^22.19.0）。
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装依赖（frozen：锁文件漂移当场判红）
+        run: pnpm install --frozen-lockfile
+
+      - name: 门禁（typecheck + 7 条 check + build）
+        run: pnpm run check
