@@ -73,7 +73,7 @@ export type TidingsSettingsSectionProps =
  * a way out. So this card carries the **acquisition** path: a link to the project's
  * GitHub page. How to install from there is the project page's business, not this card's.
  *
- * User-set address (2026-10-14).
+ * The control-plane address itself is user-editable (advanced section, 2026-10-14).
  */
 const REPO_URL = 'https://github.com/kexuejin/tidings'
 
