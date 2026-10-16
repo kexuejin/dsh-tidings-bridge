@@ -21,11 +21,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kexuejin/dsh-tidings.git"
+    "url": "git+https://github.com/kexuejin/dsh-tidings-bridge.git"
   },
-  "homepage": "https://github.com/kexuejin/dsh-tidings#readme",
+  "homepage": "https://github.com/kexuejin/dsh-tidings-bridge#readme",
   "bugs": {
-    "url": "https://github.com/kexuejin/dsh-tidings/issues"
+    "url": "https://github.com/kexuejin/dsh-tidings-bridge/issues"
   },
   "keywords": [
     "dsh-plugin",

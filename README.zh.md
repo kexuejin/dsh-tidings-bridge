@@ -1,4 +1,4 @@
-# dsh-tidings
+# dsh-tidings-bridge
 
 [English](README.md) | [中文](README.zh.md)
 
@@ -22,31 +22,37 @@
 
 ## 安装
 
-作为组合包安装（安装时现场构建，见下方说明）：
+### 方式 1：npm 官方发布物（推荐）
 
 ```sh
-dsh plugin --profile web add github:kexuejin/dsh-tidings
+dsh plugin --profile web add dsh-tidings-bridge
+```
+
+### 方式 2：作为 Git 组合包安装（安装时现场构建）
+
+```sh
+dsh plugin --profile web add github:kexuejin/dsh-tidings-bridge
 ```
 
 pnpm 默认拒绝执行 git 依赖的构建脚本，所以第一次 `add` 会以 `ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED` 失败。把 pnpm 打印的确切包键复制进 profile 的 `pnpm-workspace.yaml`，再执行一次 `add`：
 
 ```yaml
 allowBuilds:
-  dsh-tidings@git+https://github.com/kexuejin/dsh-tidings.git#<commit-sha>: true
+  dsh-tidings-bridge@git+https://github.com/kexuejin/dsh-tidings-bridge.git#<commit-sha>: true
 ```
 
 请把这项授权理解为**允许该包的代码在安装时于你的机器上执行**，且不在 agent 的任何沙箱之内。建议锁定 commit（`#<sha>`），让后续推送无法悄悄改变实际运行的内容。
 
-不想授权构建的话，就安装预构建形态 —— npm 发布物或 `pnpm pack` 的 tarball：
+### 方式 3：离线 Tarball
 
 ```sh
-dsh plugin --profile web add ./dsh-tidings-0.1.0.tgz
+dsh plugin --profile web add ./dsh-tidings-bridge-0.1.0.tgz
 ```
 
 开发时链接本地 checkout：
 
 ```sh
-dsh plugin --profile web add link:/path/to/dsh-tidings
+dsh plugin --profile web add link:/path/to/dsh-tidings-bridge
 ```
 
 ## agent 工具

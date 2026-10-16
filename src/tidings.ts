@@ -957,7 +957,7 @@ export class TidingsClient {
     const token = await this.resolveToken()
     const headers: Record<string, string> = {
       accept: 'application/json',
-      'user-agent': 'dsh-tidings/0.1.0',
+      'user-agent': 'dsh-tidings-bridge/0.1.0',
       ...token === undefined ? {} : { authorization: `Bearer ${token}` },
       ...body === undefined ? {} : { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(body)) },
     }
