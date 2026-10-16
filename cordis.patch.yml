@@ -1,0 +1,16 @@
+# dsh-tidings bundle patch: one plugin row mounting both halves.
+#
+# Host half: registers the Tidings tools and the loopback-only GUI RPC channel
+# that reads the local 捎话 host's control plane (127.0.0.1:8788).
+#
+# Browser half: since 2026-10-14 the plugin no longer owns a sidebar entry or a
+# main panel — the 8-view Web IM console was ruled out. What remains is one card
+# inside DSH's settings navigation (slot `settings.section`): connection state,
+# the auto-announce switch, and the control-plane address. Token entry goes
+# through the credential store; grant policy is edited on the desktop app.
+#
+# A patch must carry at least one row: an empty or comment-only file fails
+# profile startup.
+- insert:
+    - id: tidings-pantry
+      name: dsh-tidings

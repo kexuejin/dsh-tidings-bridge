@@ -1,0 +1,48 @@
+# ---- 依赖与锁文件外的缓存 -------------------------------------------
+node_modules/
+.pnpm-store/
+
+# ---- 构建产物：必须用根锚定 ---------------------------------------
+# /lib 与 /client 是 tsdown 的两套产物（host 的 ESM、面板的 CJS loader）。
+# 不要写成裸 `lib` / `client` —— 那条规则匹配**任何层级**，会把
+# src/client/（面板源码：TidingsSettingsSection.tsx / locales.ts / *.module.css）
+# 一起吃掉，结果构建产物没入库、源码也没入库（本仓踩过这个坑）。
+# 产物本身不入库：git 安装由 package.json 的 prepare 脚本现场构建。
+/lib
+/client
+*.tsbuildinfo
+
+# ---- 本地布局探针产物（pnpm run check:layout 的重绘目录）----------
+# 里面连 chrome-profile/ 都有：那是探针起的无头 Chrome 的用户数据目录，
+# 含组件缓存与本机浏览状态，任何时候都不该进版本库。
+.layout/
+
+# ---- Agent 开发期记忆 ---------------------------------------------
+# .workbuddy/ 是开发期 agent 的逐日笔记，内容是内部推理过程与当时的判断
+# 依据。它对当前工作树是资产，对公开仓库不是（同 teahouse-mobile 的纪律）。
+.workbuddy/
+
+# ---- Python 探针的字节码缓存 ---------------------------------------
+# docs/prototype/*.py 跑一遍就生成一份，且按解释器版本分裂。
+__pycache__/
+*.py[cod]
+
+# ---- 本地环境变量与密钥 -------------------------------------------
+# 本仓读 TIDINGS_BASE_URL / TIDINGS_AGENT_TOKEN；令牌本身走宿主凭据库，
+# 但谁都可能本地建一个 .env 来调试，必须挡住。
+.env
+.env.*
+
+# ---- 测试与覆盖率产物 ---------------------------------------------
+coverage/
+
+# ---- 操作系统与编辑器噪音 -----------------------------------------
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.swp

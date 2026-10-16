@@ -1,0 +1,8 @@
+# 行尾统一 LF：门禁脚本按换行读源码与产物，Windows 贡献者提交 CRLF
+# 会让 check:css / check:inject 这类正则门禁静默失配（判绿但没在检查）。
+* text=auto eol=lf
+
+# 图片按二进制处理，避免 GitHub 尝试做文本 diff。
+*.png binary
+*.jpg binary
+*.ico binary

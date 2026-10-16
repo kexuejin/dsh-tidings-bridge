@@ -1,0 +1,108 @@
+{
+  "name": "dsh-tidings",
+  "version": "0.1.0",
+  "description": "捎话 (Tidings) 局域网消息节点插件：把本机 agentNode 控制面接进 DeepSeek Harness —— agent 工具、设置页集成卡片与会话自动宣告。",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./client/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "client",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kexuejin/dsh-tidings.git"
+  },
+  "homepage": "https://github.com/kexuejin/dsh-tidings#readme",
+  "bugs": {
+    "url": "https://github.com/kexuejin/dsh-tidings/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "tidings",
+    "lan-im",
+    "agentnode",
+    "ppe-1"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "build": "tsdown --config tsdown.config.ts",
+    "prepare": "npm run build",
+    "typecheck": "tsc -p tsconfig.host.json && tsc -p tsconfig.client.json",
+    "check": "npm run typecheck && npm run check:css && npm run check:announce && npm run check:inject && npm run check:title && npm run check:order && npm run check:activity && npm run check:visibility && npm run build",
+    "check:inject": "node scripts/check-inject-baseline.mjs",
+    "check:announce": "node scripts/check-announce-accounting.mjs",
+    "check:title": "node scripts/check-title-shape.mjs",
+    "check:order": "node scripts/check-session-order.mjs",
+    "check:activity": "node scripts/check-session-activity.mjs",
+    "check:visibility": "node scripts/check-session-visibility.mjs",
+    "check:css": "node scripts/check-client-css.mjs",
+    "check:real": "npm run build && node check-real.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-locale": ">=0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1",
+    "@deepseek-ai/dsh-credentials": ">=0.2.0-rc.1",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.4",
+    "@deepseek-ai/dsh-client-connection": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-locale": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-layout": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-sidebar": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-credentials": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-tools": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-util-values": "^0.2.0-rc.2",
+    "@types/node": "^22.20.0",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.0",
+    "lightningcss": "^1.30.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsdown": "^0.22.14",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.4"
+  }
+}
