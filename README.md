@@ -15,7 +15,8 @@ What you get after installing:
 
 The plugin is a client of a running agentNode. Two ways to have one:
 
-- **Tidings desktop app** (recommended) — it listens on `127.0.0.1:8788` natively from its tray, so there is no process to babysit. Get it from the Tidings project repository.
+- **Tidings desktop app** (recommended) — it listens on `127.0.0.1:8788` natively from its tray, so there is no process to babysit.
+  Get it from [**kexuejin/tidings**](https://github.com/kexuejin/tidings) — the repository this plugin serves (protocol, runtime and the `agentNode` control plane all live there).
 - **Headless agentNode** — build the `agentNode` module from the Tidings source tree and run it with `--http-port 8788`. The `--http-port` listener binds loopback only.
 
 By default no token is required (loopback is trusted). If you start agentNode with `--token` or `TIDINGS_AGENT_TOKEN`, enter the same token in the settings card; it is stored in DSH's credential store and never echoed back to the page.
