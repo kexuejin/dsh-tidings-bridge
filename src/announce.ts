@@ -29,6 +29,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { TidingsClient, ResolvedConfig } from './tidings.ts'
 import { TidingsRequestError } from './tidings.ts'
 import type {
+  TidingsAgentAttachment,
   TidingsAgentEventArgs,
   TidingsAgentSessionArgs,
   TidingsAgentWorkspaceArgs,
@@ -93,6 +94,7 @@ export interface AnnounceSession {
 const EVENT_TYPE_BY_SESSION_EVENT: Readonly<Record<string, string>> = {
   'turn/start': 'session.started',
   'user/message': 'user.message',
+  'assistant/message': 'assistant.text',
   'tool/call': 'tool.started',
   'tool/result': 'tool.completed',
   'turn/end': 'turn.end',
@@ -102,7 +104,9 @@ const EVENT_TYPE_BY_SESSION_EVENT: Readonly<Record<string, string>> = {
 interface PendingEvent {
   readonly eventType: string
   readonly summary?: string | undefined
+  readonly body?: string | undefined
   readonly ref?: string | undefined
+  readonly attachment?: TidingsAgentAttachment | undefined
 }
 
 /** Per-session announcement state. */
@@ -139,6 +143,9 @@ interface SessionTrack {
    */
   updatedAt: number | undefined
   origin: 'subagent' | undefined
+  turnReasoning?: string[] | undefined
+  turnTexts?: string[] | undefined
+  shown?: number | undefined
 }
 
 /** Services the announcer needs, injected so this module owns no lifecycle. */
@@ -319,34 +326,124 @@ export class SessionAnnouncer {
       // 写日志时刻的差就是这一跳的延迟（毫秒级），而排序只比较同一工作区里的会话，
       // 这个偏差对所有条目是同一符号的偏移 —— 不改变次序。
       // 用 `>=` 覆盖而不是「有则不动」：会话 id 可复用，时钟也可能回拨。
-      if (event.type === 'user/message' && isUserAuthored(event.data)) {
+      if (event.type === 'user/message') {
+        if (!isUserAuthored(event.data)) {
+          // 合成上下文/提示词注入（time-context, model-selection, agent-instructions, dsh-mnemon）
+          // 绝不是用户提问，坚决不能作为 user.message 转发给聊天通道
+          return
+        }
         if (track.title === undefined) track.title = titleFrom(event.data)
         const at = Date.now()
         if (track.updatedAt === undefined || at >= track.updatedAt) track.updatedAt = at
       }
       // 第一帧（state: busy + 创建时刻）在这里补发：onCreated 只记账不发帧，理由见那段 KDoc。
       this.announceSession(session.id, track)
-      if (event.type === 'turn/start') this.setState(session.id, track, 'busy')
-      const pending = this.pendingFor(event, mapped)
-      // A consecutive duplicate of the same frame type carries no new
-      // information for a live feed: keep the newest summary and spend the HTTP
-      // call on what actually changed. Cursors stay monotonic either way.
-      const last = track.pending[track.pending.length - 1]
-      if (last !== undefined && last.eventType === pending.eventType) track.pending[track.pending.length - 1] = pending
-      else track.pending.push(pending)
-      if (track.pending.length > MAX_PENDING_EVENTS) track.pending.splice(0, track.pending.length - MAX_PENDING_EVENTS)
-      if (event.type === 'turn/end') {
+      if (event.type === 'turn/start') {
+        this.setState(session.id, track, 'busy')
+        track.turnReasoning = []
+        track.turnTexts = []
+        track.shown = 0
+      }
+
+      if (event.type === 'assistant/message') {
+        const data = isRecord(event.data) ? event.data : undefined
+        const msg = isRecord(data?.['message']) ? data['message'] : data
+        const content = Array.isArray(msg?.['content']) ? msg['content'] : []
+        const called = content.some(block => isRecord(block) && (block['type'] === 'tool-call' || block['type'] === 'tool_call'))
+
+        let stepText = ''
+        for (const block of content) {
+          if (isRecord(block)) {
+            if (block['type'] === 'text' && typeof block['text'] === 'string') {
+              stepText += (stepText.length > 0 ? '\n' : '') + block['text']
+            } else if (block['type'] === 'reasoning' && typeof block['text'] === 'string' && block['text'].trim().length > 0) {
+              if (!track.turnReasoning) track.turnReasoning = []
+              const r = block['text'].trim()
+              if (!track.turnReasoning.includes(r)) {
+                track.turnReasoning.push(r)
+              }
+            }
+          }
+        }
+        const cleaned = stripWrittenCalls(stepText.trim())
+        if (cleaned.length > 0) {
+          if (!track.turnTexts) track.turnTexts = []
+          track.turnTexts.push(cleaned)
+        }
+
+        // DeepSeek-Bot showSteps: what a turn says while it works goes to the group at once.
+        // A step with a tool call goes on at once; one without may be the turn's last,
+        // so it waits for the next text or the turn's end, which shows the rest as the turn's reply.
+        const texts = track.turnTexts ?? []
+        const shown = track.shown ?? 0
+        const upTo = called ? texts.length : texts.length - 1
+        for (let i = shown; i < upTo; i++) {
+          const stepText = texts[i]
+          if (stepText !== undefined && stepText.length > 0) {
+            const stepChunks = chunkUtf8(stepText, 24000)
+            for (const chunk of stepChunks) {
+              track.pending.push({
+                eventType: 'assistant.text',
+                summary: chunk.length <= 100 ? chunk.replace(/\n/g, ' ') : `${chunk.slice(0, 99).replace(/\n/g, ' ')}…`,
+                body: chunk,
+              })
+            }
+          }
+        }
+        track.shown = Math.max(shown, upTo)
+      } else if (event.type === 'turn/end') {
+        // DeepSeek-Bot turn/end: What the group already saw of the turn is not posted again.
+        const texts = track.turnTexts ?? []
+        const shown = track.shown ?? 0
+        const remaining = texts.slice(shown).join('\n\n').trim()
+        track.shown = texts.length
+
+        const fullReasoning = (track.turnReasoning ?? []).join('\n\n').trim()
+        // Cap reasoning safely so wire frame never exceeds safe limits
+        const safeReasoning = fullReasoning.length <= 2000
+          ? fullReasoning
+          : `${fullReasoning.slice(0, 2000)}\n\n[...思考过程过长，已截断...]`
+
+        if (remaining.length > 0) {
+          const prefix = safeReasoning.length > 0 ? `<think>${safeReasoning}</think>\n` : ''
+          const remainingChunks = chunkUtf8(remaining, 24000)
+          for (let i = 0; i < remainingChunks.length; i++) {
+            const chunk = remainingChunks[i]
+            const chunkBody = i === 0 ? `${prefix}${chunk}` : chunk
+            track.pending.push({
+              eventType: 'assistant.text',
+              summary: chunk.length <= 100 ? chunk.replace(/\n/g, ' ') : `${chunk.slice(0, 99).replace(/\n/g, ' ')}…`,
+              body: chunkBody,
+            })
+          }
+        } else if (fullReasoning.length > 0 && texts.length === 0) {
+          track.pending.push({
+            eventType: 'assistant.text',
+            summary: '思考完成',
+            body: `<think>${safeReasoning}</think>`,
+          })
+        }
+
         this.flush(session.id, track)
-        // The idle state rides the same window: a phone that saw `turn.end` but
-        // no session frame would keep showing a busy agent that just went quiet.
+        track.turnReasoning = []
+        track.turnTexts = []
+        track.shown = 0
         this.setState(session.id, track, 'idle')
-        // `track.state` 是可选的；只有真的有状态时才带上这个键 ——
-        // `exactOptionalPropertyTypes` 下 `{ state: undefined }` 不等于 `{ state?: string }`，
-        // 传进去会被 TS 判错（语义上也确实不同：没报状态 与 状态是空 是两回事）。
         if (track.title !== undefined) {
           this.sessionFrame(session.id, track, track.state === undefined ? {} : { state: track.state })
         }
         return
+      } else {
+        const pending = this.pendingFor(track, event, mapped)
+        if (pending !== undefined) {
+          const last = track.pending[track.pending.length - 1]
+          if (last !== undefined && last.eventType === pending.eventType) {
+            track.pending[track.pending.length - 1] = pending
+          } else {
+            track.pending.push(pending)
+          }
+          if (track.pending.length > MAX_PENDING_EVENTS) track.pending.splice(0, track.pending.length - MAX_PENDING_EVENTS)
+        }
       }
       this.schedule(session.id, track)
     })
@@ -538,11 +635,12 @@ export class SessionAnnouncer {
     const existing = this.tracks.get(sessionId)
     if (existing !== undefined) {
       if (origin !== undefined) existing.origin = origin
+      if (cwd !== undefined && existing.cwd === undefined) existing.cwd = cwd
       return existing
     }
     const created: SessionTrack = {
       state: undefined,
-      cursor: 0,
+      cursor: Date.now(),
       pending: [],
       timer: undefined,
       announced: false,
@@ -551,21 +649,40 @@ export class SessionAnnouncer {
       createdAt: undefined,
       updatedAt: undefined,
       origin,
+      turnReasoning: [],
+      turnTexts: [],
+      shown: 0,
     }
     this.tracks.set(sessionId, created)
     return created
   }
 
-  /** Build the queued frame; the summary is a label, never a transcript. */
-  private pendingFor(event: { readonly type: string; readonly data?: unknown }, eventType: string): PendingEvent {
+  /** Build the queued frame. */
+  private pendingFor(track: SessionTrack, event: { readonly type: string; readonly data?: unknown }, eventType: string): PendingEvent | undefined {
     const data = isRecord(event.data) ? event.data : undefined
     const summary = summarize(event.type, data)
+    let body: string | undefined = undefined
+    let attachment: TidingsAgentAttachment | undefined = undefined
+    if (event.type === 'user/message') {
+      body = extractUserPrompt(data)
+      if (body === undefined) return undefined
+      // 结构化附件（task-45，cap att1）：**同时**保留 body 里的占位文本。
+      // 占位是回退：对端没声明 att1（或宿主还没把 attachment 接上线上）时，
+      // 手机看到的就是那句 图片: name (920x412, 30 KB)，而不是一条消失的消息。
+      attachment = extractAttachment(data)
+    }
     const ref = event.type === 'tool/call'
       ? asString(data?.callId)
       : event.type === 'tool/result'
         ? asString(data?.callId) ?? asString(isRecord(data?.message) ? data.message['id'] : undefined)
         : undefined
-    return { eventType, ...summary === undefined ? {} : { summary }, ...ref === undefined ? {} : { ref } }
+    return {
+      eventType,
+      ...summary === undefined ? {} : { summary },
+      ...body === undefined ? {} : { body },
+      ...ref === undefined ? {} : { ref },
+      ...attachment === undefined ? {} : { attachment },
+    }
   }
 
   /** Arm the trailing window; an armed window is not re-armed. */
@@ -600,7 +717,9 @@ export class SessionAnnouncer {
           cursor,
           eventType: event.eventType,
           ...event.summary === undefined ? {} : { summary: event.summary },
+          ...event.body === undefined ? {} : { body: event.body },
           ...event.ref === undefined ? {} : { ref: event.ref },
+          ...event.attachment === undefined ? {} : { attachment: event.attachment },
         }
         void this.send(() => this.deps.client().agentEvent(args), `事件 ${event.eventType}`)
       }
@@ -627,12 +746,16 @@ export class SessionAnnouncer {
     extra: { readonly state?: string; readonly startedAt?: number; readonly createdAt?: number },
   ): void {
     if (this.closed.has(sessionId) && extra.state !== 'done') return
+    if (track.cwd === undefined) {
+      const found = this.deps.dshWorkspaces?.()?.find(w => w.sessionIds.includes(sessionId))
+      if (found !== undefined) track.cwd = found.path
+    }
     const dshWs = this.deps.dshWorkspaces?.()?.find(w => w.path === track.cwd)
-    // 成员账核验：非 subagent 且符合会话规范才可归入工作区；如果 DSH 提供了该工作区的成员账，且该会话不属于其中，则不归入该工作区
+    // 成员账核验：非 subagent 且符合会话规范才可归入工作区
     const isMember = track.origin !== 'subagent' &&
       sessionId.startsWith('session-') &&
-      (dshWs === undefined || dshWs.sessionIds.includes(sessionId))
-    const workspace = isMember ? this.deps.registry.workspaceOf(track.cwd) : undefined
+      (dshWs === undefined || dshWs.sessionIds.includes(sessionId) || track.cwd !== undefined)
+    const workspace = isMember && track.cwd !== undefined ? this.deps.registry.workspaceOf(track.cwd) : undefined
     const updatedAt = track.updatedAt ?? Date.now()
     // 「开始于 …」= 会话创建时刻。只有推迟宣告时由调用方从 track 里递进来（那时现在
     // 已经不是创建那一刻了）；其余路径（状态变化、关闭）没有可说的创建时刻，就不带。
@@ -666,10 +789,11 @@ export class SessionAnnouncer {
   private targets(): readonly string[] {
     const configured = this.deps.config().announceTargets
     if (configured !== undefined && configured.length > 0) {
-      return configured.map(target => target.trim()).filter(target => target.length > 0)
+      return Array.from(new Set(['self', ...configured.map(target => target.trim()).filter(target => target.length > 0)]))
     }
     this.refreshPeers()
-    return this.peers.filter(peer => peer.online).map(peer => peer.nodeId)
+    const onlinePeers = this.peers.filter(peer => peer.online).map(peer => peer.nodeId)
+    return Array.from(new Set(['self', ...onlinePeers]))
   }
 
   /** Refresh the peer list at most once per window; never blocks a listener. */
@@ -771,6 +895,17 @@ function summarize(type: string, data: Record<string, unknown> | undefined): str
       const name = asString(data['name']) ?? asString(message?.['name'])
       return failed ? `${name ?? 'tool'} 失败` : name
     }
+    case 'assistant/message': {
+      const msg = isRecord(data['message']) ? data['message'] : data
+      const content = Array.isArray(msg['content']) ? msg['content'] : []
+      for (const block of content) {
+        if (isRecord(block) && block['type'] === 'text' && typeof block['text'] === 'string') {
+          const line = block['text'].replace(/\s+/gu, ' ').trim()
+          if (line.length > 0) return line.length <= 100 ? line : `${line.slice(0, 99)}…`
+        }
+      }
+      return undefined
+    }
     case 'user/message':
       return titleFrom({ content: data['content'] })
     default:
@@ -815,5 +950,158 @@ function titleFrom(data: unknown): string | undefined {
     if (line.length === 0) continue
     return line.length <= MAX_TITLE_LENGTH ? line : `${line.slice(0, MAX_TITLE_LENGTH - 1)}…`
   }
+  // 只有图片的用户消息（真机实测：DSH 里直接贴一张图）：没有文本块时标题会是空的，
+  // 会话在手机上就退回 session-…。用附件占位当标题。
+  for (const block of content) {
+    if (!isRecord(block)) continue
+    const placeholder = attachmentPlaceholder(block)
+    if (placeholder !== undefined) return placeholder
+  }
   return undefined
 }
+
+/**
+ * Extract full user prompt text from user/message content blocks.
+ */
+/**
+ * 协议对 attachment 的硬上限（core/protocol 的 Limits.AGENT_ATTACHMENT_*）。
+ *
+ * 越界是**整帧拒**（不是丢附件）：所以这里先自检，越界就把 attachment 丢掉、只发
+ * 文本占位 —— 少一张卡片，好过整条事件消失（半张卡片比占位更糟）。
+ */
+const ATTACHMENT_LIMITS = {
+  id: 128,
+  mediaType: 64,
+  name: 128,
+  dimension: 32768,
+  bytes: 512 * 1024 * 1024,
+} as const
+
+/**
+ * user/message 的 content 块 → 结构化附件元数据（取第一个带 attachment 的块）。
+ *
+ * 字段口径与 DSH 的 content 块逐字一致（真机 log 实测）：
+ *   { type: 'image', attachment: { attachmentId, mediaType, width, height, bytes, name } }
+ *
+ * 任一字段越界 ⇒ 返回 undefined：宁可只发占位，也不发一帧会被整帧拒的载荷。
+ */
+function extractAttachment(data: unknown): TidingsAgentAttachment | undefined {
+  if (!isRecord(data)) return undefined
+  const content = data['content']
+  if (!Array.isArray(content)) return undefined
+  for (const block of content) {
+    if (!isRecord(block)) continue
+    const raw = isRecord(block['attachment']) ? block['attachment'] : undefined
+    if (raw === undefined) continue
+    const attachmentId = asString(raw['attachmentId'])
+    const mediaType = asString(raw['mediaType'])
+    if (attachmentId === undefined || mediaType === undefined) continue
+    if (attachmentId.length > ATTACHMENT_LIMITS.id) return undefined
+    if (mediaType.length > ATTACHMENT_LIMITS.mediaType) return undefined
+    const width = typeof raw['width'] === 'number' ? raw['width'] : undefined
+    const height = typeof raw['height'] === 'number' ? raw['height'] : undefined
+    const bytes = typeof raw['bytes'] === 'number' ? raw['bytes'] : undefined
+    const name = asString(raw['name'])
+    if (width !== undefined && (!Number.isInteger(width) || width < 0 || width > ATTACHMENT_LIMITS.dimension)) return undefined
+    if (height !== undefined && (!Number.isInteger(height) || height < 0 || height > ATTACHMENT_LIMITS.dimension)) return undefined
+    if (bytes !== undefined && (!Number.isInteger(bytes) || bytes < 0 || bytes > ATTACHMENT_LIMITS.bytes)) return undefined
+    if (name !== undefined && name.length > ATTACHMENT_LIMITS.name) return undefined
+    return {
+      attachmentId,
+      mediaType,
+      ...width === undefined ? {} : { width },
+      ...height === undefined ? {} : { height },
+      ...bytes === undefined ? {} : { bytes },
+      ...name === undefined ? {} : { name },
+    }
+  }
+  return undefined
+}
+
+function extractUserPrompt(data: unknown): string | undefined {
+  if (!isRecord(data)) return undefined
+  const content = data['content']
+  if (!Array.isArray(content)) return undefined
+  const parts: string[] = []
+  for (const block of content) {
+    if (!isRecord(block)) continue
+    if (block['type'] === 'text' && typeof block['text'] === 'string') {
+      if (block['text'].length > 0) parts.push(block['text'])
+      continue
+    }
+    // **真机缺陷（2026-10-18，用户反馈「DSH 发的图片消息 tidings 看不到」）**：
+    // 这里原来只拼 text 块。于是一条**只有图片**的用户消息得到空串 ⇒
+    // pendingFor 直接 return undefined ⇒ **整条事件根本不转发**，手机上连一个占位
+    // 都没有（不是图没渲染，是这条消息不存在）。
+    // 本仓协议帧（AGENT_EVENT）只有 summary/body/ref 三个文本字段、没有附件通道，
+    // 所以图片/附件块必须转成一行**占位文本**，事件才发得出去。
+    const placeholder = attachmentPlaceholder(block)
+    if (placeholder !== undefined) parts.push(placeholder)
+  }
+  const prompt = parts.join('\n').trim()
+  return prompt.length > 0 ? prompt : undefined
+}
+
+/**
+ * 图片/附件内容块 → 一行占位文本。
+ *
+ * DSH 的 user/message content 里图片长这样（真机 session log 实测）：
+ *
+ *     { type: 'image',
+ *       attachment: { attachmentId, mediaType: 'image/jpeg', width: 920, height: 412,
+ *                     bytes: 31169, name: 'image.png' } }
+ *
+ * 协议没有附件通道 ⇒ 至少把「有一张图、叫什么、多大」如实报上去，手机端就能画出
+ * 附件卡片/占位，而不是整条消息消失。
+ */
+function attachmentPlaceholder(block: Record<string, unknown>): string | undefined {
+  const type = typeof block['type'] === 'string' ? block['type'] : ''
+  const attachment = isRecord(block['attachment']) ? block['attachment'] : undefined
+  if (attachment === undefined) return undefined
+  if (type !== 'image' && type !== 'file' && type !== 'attachment') return undefined
+  const name = asString(attachment['name']) ?? (type === 'image' ? 'image' : 'attachment')
+  const width = typeof attachment['width'] === 'number' ? attachment['width'] : undefined
+  const height = typeof attachment['height'] === 'number' ? attachment['height'] : undefined
+  const bytes = typeof attachment['bytes'] === 'number' ? attachment['bytes'] : undefined
+  const bits: string[] = []
+  if (width !== undefined && height !== undefined) bits.push(width + '×' + height)
+  if (bytes !== undefined) {
+    bits.push(bytes >= 1024 * 1024 ? (bytes / 1024 / 1024).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes / 1024)) + ' KB')
+  }
+  const label = type === 'image' ? '🖼 图片' : '📎 附件'
+  return bits.length > 0 ? label + ': ' + name + ' (' + bits.join(', ') + ')' : label + ': ' + name
+}
+
+/**
+ * Clean written tool calls from model output (ported from DeepSeek-Bot).
+ * Some models write <tool_call>... or <function=...> into text; these are pseudo-calls that never ran.
+ */
+function stripWrittenCalls(text: string): string {
+  return text
+    .replace(/<tool_call>[\s\S]*?(?:<\/tool_call>|$)/gu, '')
+    .replace(/<function=[\w.-]+>[\s\S]*?(?:<\/function>|$)/gu, '')
+    .trim()
+}
+
+/**
+ * Safely split text by UTF-8 byte length without breaking multi-byte sequences.
+ */
+function chunkUtf8(text: string, maxBytes: number): string[] {
+  if (Buffer.byteLength(text, 'utf8') <= maxBytes) return [text]
+  const chunks: string[] = []
+  let cur = ''
+  let curBytes = 0
+  for (const ch of text) {
+    const b = Buffer.byteLength(ch, 'utf8')
+    if (curBytes + b > maxBytes && cur.length > 0) {
+      chunks.push(cur)
+      cur = ''
+      curBytes = 0
+    }
+    cur += ch
+    curBytes += b
+  }
+  if (cur.length > 0) chunks.push(cur)
+  return chunks
+}
+

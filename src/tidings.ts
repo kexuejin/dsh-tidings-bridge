@@ -653,6 +653,18 @@ export class TidingsClient {
     if (args.summary !== undefined) requestBody.summary = args.summary
     if (args.body !== undefined) requestBody.body = args.body
     if (args.ref !== undefined) requestBody.ref = args.ref
+    if (args.attachment !== undefined) {
+      // 只放协议白名单里的六个键，且按协议顺序 —— 多一个键整帧拒（半张卡片比占位更糟）。
+      const a = args.attachment
+      requestBody.attachment = {
+        attachmentId: a.attachmentId,
+        mediaType: a.mediaType,
+        ...a.width === undefined ? {} : { width: a.width },
+        ...a.height === undefined ? {} : { height: a.height },
+        ...a.bytes === undefined ? {} : { bytes: a.bytes },
+        ...a.name === undefined ? {} : { name: a.name },
+      }
+    }
 
     const body = await this.request({ method: 'POST', path: '/v1/agent/event', body: requestBody })
     const value = isRecord(body) ? body : {}

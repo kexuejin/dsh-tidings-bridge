@@ -252,6 +252,25 @@ export interface TidingsAgentSessionArgs {
 }
 
 /** Arguments of `POST /v1/agent/event` (PPE-1 §6.2). */
+/**
+ * agent-event 的可选附件元数据（task-45，cap att1）。
+ *
+ * **只带元数据，字节不走这里**：图片/文件的字节仍走既有文件传输路径（file-msg /
+ * file-ctl）。口径与 DSH 侧 user/message 的 content 块逐字一致：
+ *   { type: 'image', attachment: { attachmentId, mediaType, width, height, bytes, name } }
+ *
+ * 键名与顺序由 core/protocol 的 CodecAgent 定：attachmentId / mediaType / width /
+ * height / bytes / name（除前两个外都可选）。**多一个键整帧拒** ⇒ 这里只放这六个。
+ */
+export interface TidingsAgentAttachment {
+  readonly attachmentId: string
+  readonly mediaType: string
+  readonly width?: number
+  readonly height?: number
+  readonly bytes?: number
+  readonly name?: string
+}
+
 export interface TidingsAgentEventArgs {
   readonly to: string
   readonly sessionId: string
@@ -261,6 +280,12 @@ export interface TidingsAgentEventArgs {
   readonly summary?: string
   readonly body?: string
   readonly ref?: string
+  /**
+   * 附件元数据（可选）。**带不带由宿主决定**：控制面读不到对端 caps（见 index.ts 里
+   * 同一句说明），所以「只有声明 att1 的对端才收到 attachment」这条闸门在宿主控制面
+   * 一侧（它按 to 解析对端、知道对方 caps）。本端把事实如实报上去。
+   */
+  readonly attachment?: TidingsAgentAttachment
 }
 
 /**

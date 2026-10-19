@@ -42,7 +42,7 @@
     "build": "tsdown --config tsdown.config.ts",
     "prepare": "npm run build",
     "typecheck": "tsc -p tsconfig.host.json && tsc -p tsconfig.client.json",
-    "check": "npm run typecheck && npm run check:css && npm run check:announce && npm run check:inject && npm run check:title && npm run check:order && npm run check:activity && npm run check:visibility && npm run build",
+    "check": "npm run typecheck && npm run check:css && npm run check:announce && npm run check:inject && npm run check:title && npm run check:order && npm run check:activity && npm run check:visibility && npm run check:image && npm run check:image:selftest && npm run check:attachment && npm run check:attachment:selftest && npm run build",
     "check:inject": "node scripts/check-inject-baseline.mjs",
     "check:announce": "node scripts/check-announce-accounting.mjs",
     "check:title": "node scripts/check-title-shape.mjs",
@@ -50,7 +50,11 @@
     "check:activity": "node scripts/check-session-activity.mjs",
     "check:visibility": "node scripts/check-session-visibility.mjs",
     "check:css": "node scripts/check-client-css.mjs",
-    "check:real": "npm run build && node check-real.mjs"
+    "check:real": "npm run build && node check-real.mjs",
+    "check:image": "node scripts/check-image-blocks.mjs",
+    "check:image:selftest": "node scripts/check-image-blocks.mjs --self-test",
+    "check:attachment": "node scripts/check-attachment-passthrough.mjs",
+    "check:attachment:selftest": "node scripts/check-attachment-passthrough.mjs --self-test"
   },
   "dsh": {
     "bundle": {
