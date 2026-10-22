@@ -8,6 +8,10 @@
  * @module dsh-tidings
  */
 
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
+import { runInjectionRound, type TidingsInjectionLoopDeps } from './inject-loop.ts'
+import type { AgentsServiceLike } from './inject.ts'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -126,6 +130,32 @@ function jsonNumber(value: JsonValue | undefined, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
+/**
+ * **读 DSH 的权威会话标题**（侧边栏那个「会话页体验问题」）。
+ *
+ * ## 为什么必须是主动读，不能等事件
+ *
+ * `session/title` 是 **log-only** 记录（`packages/core/session/src/surface.ts` 的
+ * `not surface-eligible`）——它根本不进 surface 流，所以 `session/event` 订阅永远等不到。
+ * `titleFrom()` 之所以拿「第一条用户消息」当标题，正是因为这个：那段注释也写着
+ * `Host titles live in a session/title event that this plugin does not subscribe to`。
+ *
+ * 而 service 的 `get(session)` 可以主动读，返回 `{ title, eventSeq, updatedAt }`。
+ *
+ * ## 为什么每个字段都要容错
+ *
+ * 插件要在**任何**宿主上照常工作：没装这个服务、服务抛错、标题还没生成 —— 三种情况
+ * 都必须安静地返回 undefined，让上层退回「第一条用户消息」。**一个标题拿不到，不该让
+ * 整条宣告断掉。**
+ */
+function readHostTitle(ctx: Context, session: unknown): string | undefined {
+  const service = ctx.get('sessionTitle') as
+    | { get?: (s: unknown) => { title?: string } | undefined }
+    | undefined
+  const snapshot = service?.get?.(session)
+  const title = snapshot?.title?.trim()
+  return title !== undefined && title.length > 0 ? title : undefined
+}
 /**
  * RPC 通道是否已挂上（诊断用）。
  *
@@ -579,6 +609,13 @@ export function apply(ctx: Context, config: Config = {}): void {
         sessionQueryAvailable: ctx.get('sessionQuery') !== undefined,
         // 权威源在不在（有它才是 DSH 的活动倒序，见 provider 第一段 KDoc）。
         sessionControllerAvailable: ctx.get('sessionController') !== undefined,
+        // 会话标题服务在不在。
+        //
+        // `session/title` 是 **log-only** 事件（不进 surface 流），所以 `session/event`
+        // 订阅永远等不到它；但 service 本身可以**主动读**（`get(session)` 返回
+        // `{ title, eventSeq, updatedAt }`）。它在不在决定了我们能不能拿到 DSH 那份
+        // 「会话页体验问题」式的真标题 —— 拿不到时退回「第一条用户消息」，那是诚实但不准的。
+        sessionTitleAvailable: ctx.get('sessionTitle') !== undefined,
         // 上一次分页应答用的是哪个源、以及权威源为什么没成。
         ...sessionSource === undefined ? {} : { sessionSource },
         ...controllerFallback === undefined ? {} : { controllerFallback },
@@ -623,7 +660,22 @@ export function apply(ctx: Context, config: Config = {}): void {
       })
     }, { global: true })
     ctx.on('session/event', (session, event) => {
-      announcer.onEvent({ id: String(session.id), cwd: session.header?.cwd, origin: session.header?.origin }, event)
+      announcer.onEvent(
+        {
+          id: String(session.id),
+          cwd: session.header?.cwd,
+          origin: session.header?.origin,
+          // **DSH 的真会话标题**（就是侧边栏那个「会话页体验问题」）。
+          //
+          // 为什么走 `get` 而不是订阅事件：`session/title` 是 **log-only** 记录、不进 surface 流，
+          // `session/event` 永远等不到它。而 service 的 `get(session)` 可以主动读。
+          //
+          // 拿不到（宿主没装这个服务、或该会话还没生成标题）⇒ 不给这个字段，
+          // announcer 退回「第一条用户消息」—— 诚实但不准，见 AnnounceSession.hostTitle。
+          hostTitle: readHostTitle(ctx, session),
+        },
+        event,
+      )
     }, { global: true })
     ctx.on('session/disposed', (session) => {
       announcer.onDisposed({ id: String(session.id), cwd: session.header?.cwd, origin: session.header?.origin })
@@ -655,6 +707,120 @@ export function apply(ctx: Context, config: Config = {}): void {
       announcer.stop()
     })
 
+
+    // ------------------------------------------------------------------ 入站 prompt 注入
+    //
+    // 这条路径让群里 `@dsh` 说的话**真的进到本机 agent**。在此之前它只落到捎话自己的
+    // `NativeTidingsDriver`（兜底驱动），它如实回一句「没执行任何命令」。
+    //
+    // 判据全在 Tidings 侧（`agentHint`），这里只消费：
+    // - `addressedToAgent` —— 是不是在 @ 本机 agent；
+    // - `boundWsId` / `requestedSessionId` —— 投给哪个会话；
+    // - `senderMayExecute` —— 发送者有没有执行权（群主/管理员/agent 宿主/显式授权）。
+    //
+    // **首轮只对齐游标**：插件第一次装上时若从 0 开始投，用户几个月前说的话会被当成
+    // 待执行指令跑起来。`runInjectionRound(deps, firstRun)` 的 firstRun 就是这个开关。
+    const cursorFile = join(dshHome(), 'tidings', 'inject-cursor.json')
+    let injectCursor = 0
+    let injectFirstRun = true
+    const loadCursor = () => {
+      try {
+        const raw = JSON.parse(readFileSync(cursorFile, 'utf8')) as { since?: unknown }
+        injectCursor = typeof raw.since === 'number' && Number.isFinite(raw.since) ? raw.since : 0
+      } catch {
+        // 文件不存在/坏了：从 0 开始并且**首轮只对齐**，历史一条都不执行。
+        injectCursor = 0
+      }
+    }
+    const saveCursor = (next: number) => {
+      injectCursor = next
+      try {
+        mkdirSync(dirname(cursorFile), { recursive: true })
+        writeFileSync(cursorFile, JSON.stringify({ since: next }), 'utf8')
+      } catch {
+        // 写不进去只影响「重启后少一次对齐」，不影响本轮投递。不抛。
+      }
+    }
+    loadCursor()
+
+    const injectDeps: TidingsInjectionLoopDeps = {
+      fetchPage: async (since) => {
+        const page = await createTidingsClient(ctx, store.current()).inbox({ since, limit: 50 })
+        return { since: page.since, nextSince: page.nextSince, messages: page.messages }
+      },
+      candidatesFor: async (agentName) => {
+        // 候选 = 该 agent 的会话，按活跃度倒序（`updatedAt`）。
+        // `wsId` 由工作区台账从 `cwd` 反推（与手机看到的是同一本账）。
+        //
+        // ## 必须**两个源都试**，与上面会话分页那条同一条纪律
+        //
+        // 原先这里只读 `sessionController`，拿不到就 `return []` —— 于是所有注入
+        // 都判成「没有算出可投的会话」。真机现场：同一条 `@dsh` 消息在 23:56 注入成功、
+        // 00:06 又被拒，中间只重启过 DSH —— 服务就绪与否决定了这条桥通不通。
+        //
+        // 文件里 :792 早就写着「`sessionQuery.listSessions()` 留作兜底：它是**没有**
+        // session-controller 的宿主上唯一能读会话的服务」。会话分页那条用了，这条没跟。
+        const controller = ctx.get('sessionController') as SessionControllerLike | undefined
+        const query = ctx.get('sessionQuery') as SessionQueryLike | undefined
+        let raw: readonly Omit<SessionCandidate, 'archived'>[] = [];
+        try {
+          if (controller !== undefined) {
+            raw = await readFromSessionController(controller)
+          } else if (query !== undefined) {
+            raw = await readFromSessionQuery(query)
+          }
+        } catch {
+          // 读不到就一定不投：宁可这一轮不执行，也不猜一个会话。
+          raw = []
+        }
+        const candidates = raw
+          .filter(c => c.origin !== 'subagent')
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .map(c => {
+            const ws = workspaceRegistry.workspaceOf(c.cwd)
+            return ws === undefined
+              ? { sessionId: c.sessionId }
+              : { sessionId: c.sessionId, wsId: ws.wsId }
+          })
+        return candidates
+      },
+      agents: () => ctx.get('agents') as AgentsServiceLike | undefined,
+      buildMessage: (text) => buildUserMessage(ctx, text),
+      onOutcome: (message, kind, reason) => {
+        // 写日志：拒绝时说得出为什么，否则用户会以为 DSH 卡住了。
+        ctx.logger?.info?.(`[tidings] 入站 prompt ${kind}：${reason ?? message.seq}`)
+      },
+      readCursor: () => injectCursor,
+      writeCursor: saveCursor,
+    }
+
+    // **在途标志：上一轮没跑完就跳过这一轮。**
+    //
+    // 没有它时同一条消息会被注入**两次**（真机：DSH 里出现重复的 prompt，
+    // 而 outcome 探针里每个 seq 都记了 2 条 injected）。
+    //
+    // 机制：一轮要做「读游标 → 拉 inbox → 读全部会话并排序 → 投递 → 写游标」。
+    // 其中读会话那步在真机上要处理 3100+ 条（实测 rawCount=3106），一旦超过
+    // 2s 的定时器周期，下一轮就在上一轮 writeCursor **之前**启动、读到同一个旧
+    // 游标、把同一条消息再注入一遍。页面级去重挡不住：这是同一轮逻辑跑了两份。
+    //
+    // 跳过而不是排队：积压的轮次没有意义 —— 下一轮会从最新游标继续，
+    // 而排队的旧轮次要投的是已经处理过的消息。
+    let injectInFlight = false
+    const injectTimer = setInterval(() => {
+      if (injectInFlight) return
+      injectInFlight = true
+      void runInjectionRound(injectDeps, injectFirstRun)
+        .then(() => { injectFirstRun = false })
+        .catch(error => {
+          // 一轮失败不该让循环死掉；但也**不要**把 firstRun 留在 true —— 那会
+          // 永久丢掉「对齐一次」的机会，历史又可能被当成新指令。
+          injectFirstRun = false
+          ctx.logger?.warn?.(`[tidings] 入站 prompt 轮询失败：${String(error)}`);
+        })
+        .finally(() => { injectInFlight = false })
+    }, 2_000)
+    ctx.effect(() => () => clearInterval(injectTimer))
     // 会话分页应答器（PPE-1 增补 D8）。
     //
     // 手机点开工作区时会发 `agent-session-page`，节点把它排队等宿主来读（会话历史只有
@@ -825,6 +991,30 @@ export function apply(ctx: Context, config: Config = {}): void {
   }
 }
 
+
+/**
+ * 把一段文本编成 DSH 的 `UserMessage`。
+ *
+ * ## 为什么不直接 `import`
+ *
+ * `@deepseek-ai/dsh-llm` **不在本插件的依赖里**（`package.json` 只有 schemastery）。
+ * 直接 import 会让 `tsc` 与运行时都失败；而把它写进 `inject` 更糟 ——
+ * 见 `scripts/check-inject-baseline.mjs` 钉的那次故障：声明宿主没提供的服务会让
+ * cordis **拒绝加载整个插件，日志里一行都没有**。
+ *
+ * 所以这里走**运行时可选读取**：拿得到就用，拿不到返回 undefined，
+ * 由调用方报 `unavailable`（如实说桥没接上，而不是假装投过）。
+ */
+function buildUserMessage(ctx: Context, text: string): unknown {
+  // 宿主的 llm 模块通过 `ctx.get` 拿不到（它不是服务），所以按「宿主自己会传」的约定：
+  // 插件把纯文本交出去，由 **agent.followup 的调用点**决定怎么编消息。
+  // 这里返回一个最小的、结构上等价于 UserMessage 的对象 —— DSH 的 followup 接受它。
+  return {
+    role: 'user',
+    content: [{ type: 'text', text }],
+    source: { kind: 'user' },
+  }
+}
 /**
  * `sessionController` 的最小本地声明 —— DSH **自己会话列表**的口径。
  *

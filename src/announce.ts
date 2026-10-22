@@ -88,6 +88,15 @@ export interface AnnounceSession {
    * 分页那条路（index.ts 的 `visibleOnPhone`）早就有这条判据，缺的是实时这条路。
    */
   readonly origin?: 'subagent' | undefined
+  /**
+   * **DSH 的权威会话标题**（侧边栏那个「会话页体验问题」）。
+   *
+   * 为什么要单独一个字段、而不是就地用它替换 `track.title`：`titleFrom()` 的兜底仍然
+   * 有价值（宿主没装 sessionTitle 服务时只能用它），两者是**优先关系**不是替代关系。
+   *
+   * 拿不到时（服务不存在 / 该会话还没生成标题）为 undefined ⇒ 退回第一条用户消息。
+   */
+  readonly hostTitle?: string | undefined
 }
 
 /** The session/event subset this module maps; every other type is ignored. */
@@ -332,7 +341,17 @@ export class SessionAnnouncer {
           // 绝不是用户提问，坚决不能作为 user.message 转发给聊天通道
           return
         }
-        if (track.title === undefined) track.title = titleFrom(event.data)
+        // **权威标题优先**：真标题来了就用它，没有才退回第一条用户消息。
+        //
+        // 两者是**优先关系**：`titleFrom` 仍是宿主没装 sessionTitle 服务时唯一能拿到的东西，
+        // 删了它等于在没有该服务的宿主上连「第一条用户消息」都没有。
+        const authoritative = session.hostTitle?.trim()
+        if (authoritative !== undefined && authoritative.length > 0) {
+          // 标题可能被用户显式改过（sessionTitle.rename），所以要允许更新。
+          if (track.title !== authoritative) track.title = authoritative
+        } else if (track.title === undefined) {
+          track.title = titleFrom(event.data)
+        }
         const at = Date.now()
         if (track.updatedAt === undefined || at >= track.updatedAt) track.updatedAt = at
       }
