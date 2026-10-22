@@ -41,6 +41,7 @@ import type {
   TidingsHealthView,
   TidingsInboxArgs,
   TidingsInboxView,
+  TidingsAgentHint,
   TidingsMessageView,
   TidingsPairingQrResult,
   TidingsPeerView,
@@ -524,6 +525,7 @@ function normalizeMessage(raw: unknown, labels: ReadonlyMap<string, string>): Ti
   const peerId = stringField(raw.peerId) ?? ''
   const envelope = isRecord(raw.envelope) ? raw.envelope : {}
   const payload = isRecord(envelope.payload) ? envelope.payload : {}
+  const agentHint = normalizeAgentHint(raw.agentHint)
   return {
     seq,
     peerId,
@@ -532,7 +534,39 @@ function normalizeMessage(raw: unknown, labels: ReadonlyMap<string, string>): Ti
     at: numberField(raw.at) ?? 0,
     kind: stringField(payload.kind) ?? 'unknown',
     text: typeof payload.text === 'string' ? payload.text : '',
+    // 只有真的带了才写这个键 —— 「缺键」与「有键但 false」是两种不同的事实。
+    ...agentHint === undefined ? {} : { agentHint },
   }
+}
+
+/**
+ * 解析 Tidings 给出的注入判定。
+ *
+ * 字段缺失时**不补默认值**：`boundWsId` 缺省表示「未绑定」，这是一个有意义的状态
+ * （用户明确说过 agent 不绑工作区也能对话），不能当成「不知道」再用默认值盖掉。
+ *
+ * @returns undefined = 这条消息没有注入判定（不是给 agent 的，或对端版本不提供）。
+ */
+function normalizeAgentHint(raw: unknown): TidingsAgentHint | undefined {
+  if (!isRecord(raw)) return undefined
+  const addressed = raw.addressedToAgent
+  if (typeof addressed !== 'boolean') return undefined
+  const hint: TidingsAgentHint = {
+    addressedToAgent: addressed,
+    ...stringField(raw.boundWsId) === undefined ? {} : { boundWsId: stringField(raw.boundWsId) },
+    ...stringField(raw.requestedSessionId) === undefined
+      ? {}
+      : { requestedSessionId: stringField(raw.requestedSessionId) },
+    ...stringField(raw.agentName) === undefined ? {} : { agentName: stringField(raw.agentName) },
+    // 授权结论：缺键 ⇒ false（fail-closed，旧版 Tidings 不放行执行）。
+    senderMayExecute: raw.senderMayExecute === true,
+    ...stringField(raw.denyReason) === undefined ? {} : { denyReason: stringField(raw.denyReason) },
+    ...stringField(raw.targetSessionId) === undefined
+      ? {}
+      : { targetSessionId: stringField(raw.targetSessionId) },
+    ...typeof raw.senderIsAgent === 'boolean' ? { senderIsAgent: raw.senderIsAgent } : {},
+  }
+  return hint
 }
 
 export class TidingsClient {

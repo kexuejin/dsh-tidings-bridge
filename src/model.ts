@@ -100,6 +100,54 @@ export interface TidingsMessageView {
   readonly kind: string
   /** Text payload; empty when the payload is not text. */
   readonly text: string
+  /**
+   * 注入判定（Tidings 侧给出，见捎话仓的 `AgentInboxEnricher`）。
+   *
+   * 没有这个键 = 这条不是给 agent 的（或者对端版本还不提供）；
+   * 有键 = 这条消息 @ 到了某个 agent，可按 `boundWsId` / `requestedSessionId` 找会话。
+   *
+   * **刻意不做成「布尔 + 一堆默认值」**：缺键与「有键但 addressedToAgent=false」
+   * 是两种不同的事实，前者是「不知道」，后者是「知道且不是」。
+   */
+  readonly agentHint?: TidingsAgentHint
+}
+
+/** Tidings 给出的注入判定。字段含义与捎话仓 `AgentInboxHint` 一一对应。 */
+export interface TidingsAgentHint {
+  readonly addressedToAgent: boolean
+  /** 该 agent 绑定的工作区；缺省 = 未绑定（一等状态，不是缺失）。 */
+  readonly boundWsId?: string | undefined
+  /** 用户在文本里显式指定的会话；缺省 = 走默认。 */
+  readonly requestedSessionId?: string | undefined
+  /** 判定所依据的 agent 名字，仅用于诊断。 */
+  readonly agentName?: string | undefined
+  /**
+   * **发送者有没有执行权**（Tidings 侧 `AgentExecAuthorizer` 的结论）。
+   *
+   * 由宿主侧判定 —— 它持有权威授权表（`AgentGrantStore`）。桥接侧只消费：
+   * 照自己的规则再判一次会让两边对「谁算管理员」的理解分叉。
+   *
+   * 缺省（没这个键）= 旧版 Tidings，无法判断 ⇒ **按 false 处理**（fail-closed）。
+   */
+  readonly senderMayExecute?: boolean | undefined
+  /** 拒绝原因（`MemberOnly` / `NotAMember` 等），仅用于日志与回话。 */
+  readonly denyReason?: string | undefined
+  /**
+   * **投给哪个会话** —— Tidings 侧已经算好（`AgentSessionPick`）。
+   *
+   * 桥接侧**直接用**，不再自己判。这样「@ 到哪个 agent → 哪个工作区 → 哪个会话」这套策略
+   * 只有一份实现；接一个新 agent 时不需要重写它。缺省 = 没算出可投的会话，此时不投。
+   */
+  readonly targetSessionId?: string | undefined
+  /**
+   * **这条消息是不是 agent 自己说的**（发送者是 `agent:*` 身份）。
+   *
+   * 回声的判据是**发送者身份**，不是方向：本机用户 @ 自己的 agent 时 `direction` 是
+   * `out`，但那不是回声 —— 它是用户第一次下指令。只看方向会把这条第一条就跳过。
+   *
+   * 缺省（没这个键）= 旧版 Tidings ⇒ 不按回声处理（宁可投一次，也不要静默丢掉用户指令）。
+   */
+  readonly senderIsAgent?: boolean | undefined
 }
 
 /** `GET /v1/inbox`, with `nextSince` safe to feed back as the next `since`. */
