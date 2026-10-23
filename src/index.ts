@@ -159,38 +159,76 @@ function readHostTitle(ctx: Context, session: unknown): string | undefined {
 /**
  * RPC 通道是否已挂上（诊断用）。
  *
- * 为什么要有它：挂载点在 `ctx.inject(['connection','webServer'], ...)` 的回调里 ——
+ * 为什么要有它：挂载点在 `ctx.inject(['connection'], ...)` 的回调里 ——
  * 那个回调**依赖就绪才触发**，所以「代码写了」不等于「通道挂上了」。而挂不上的症状是
  * 浏览器那条请求永远 pending、卡片永远停在「检查中…」（2026-10-15 真机抓到）。
  * 这个标志让 `tidings_announce_status` 能直接回答「挂上了没有」。
  */
 let rpcMounted = 'not-yet'
 
+/** 挂载失败时的栈前几帧；只有失败时才有值。诊断用，随 `tidings_announce_status` 输出。 */
+let rpcErrorStack = ''
+
 export function apply(ctx: Context, config: Config = {}): void {
   const store = new TidingsConfigStore(config)
-  // ## RPC 通道必须在**web 上下文就绪后**才挂（2026-10-14 真机抓到：卡片永远停在「检查中…」）
+  // ## RPC 通道必须在 `connection` 就绪后才挂（2026-10-14 真机抓到：卡片永远停在「检查中…」）
   //
-  // 原先这里直接 `registerTidingsRpc(ctx, store)`。看起来对（`inject` 里声明了 connection），
-  // 但**挂载时机不对**：web 半的 RPC 前缀路由是随 `webServer` 起来的，apply 阶段那个
-  // connection 座还没有可挂的载体。后果：浏览器发出的 `POST /tidings-pantry/status`
-  // 进了服务端却**永远没有响应**（用调试面板看该请求一直是 `pending`），卡片于是永远
-  // 停在「检查中…」，而屏幕上没有一句话说为什么。
+  // 原先这里直接 `registerTidingsRpc(ctx, store)`，apply 阶段 connection 座还没有可挂的载体。
+  // 后果：浏览器发出的 `POST /tidings-pantry/status` 进了服务端却**永远没有响应**
+  // （调试面板看该请求一直是 `pending`），卡片于是永远停在「检查中…」，
+  // 而屏幕上没有一句话说为什么。
   //
-  // 判据：**通道的挂载点要跟它的宿主服务对齐**。本仓现在按参考实现（dsh-mnemon）的写法，
-  // 在 `ctx.inject(['connection','webServer'], ...)` 里挂 —— 那才是「web 通道已能路由」的
-  // 那一刻。
-  ctx.inject(['connection', 'webServer'], (webCtx: Context) => {
+  // 判据：**通道的挂载点要跟它的宿主服务对齐** —— 那件事的宿主是 `connection`，不是别的。
+  // ## 只注入 `connection`，**不要**把 `webServer` 也写进 inject（2026-10-23 抓到）
+  //
+  // 原来写的是 `inject(['connection', 'webServer'])`。在 web 宿主上它成立，
+  // 但在**桌面端宿主**上没有 `webServer` 服务，于是这个 inject 直接抛：
+  //
+  //     cannot get property "webServer" without inject
+  //
+  // 后果不是报错弹窗，而是**静默**：`registerTidingsRpc` 一行都没执行，
+  // 设置页那条 `status` 请求永远没有通道可走，面板上于是显示「未检测到捎话桌面端」，
+  // 而桌面端其实好好地在 8788 上跑着（`/healthz` 返回 ok:true，工具 `tidings_status` 也正常）。
+  // 诊断判据就是 `tidings_announce_status` 里的 `rpcMounted`：
+  // 'ok' 才算通道挂上了；'failed: ...' 时面板一定不可用，与桌面端在不在无关。
+  //
+  // `ctx.connection.rpc.handle` 本身只依赖 `connection` —— `webServer` 从来不是必需品，
+  // 那是从「web 路由前缀随 webServer 起来」的旧注释里带过来的。本仓 `dsh-growth` 的
+  // 写法也是只注入 `connection`，并在注释里说明了同一条纪律：
+  // **多声明一个服务，会让这个入口在没有该服务的宿主上永远 pending。**
+  // ## 先确认宿主到底有没有 webServer —— 没有就别去挂，也别把错推给用户
+  //
+  // 2026-10-23 用栈定位到：ctx.connection.rpc.handle(...) 内部会注册一条**HTTP 前缀路由**
+  // （dsh-client-connection 的 register），因此它必须能拿到 webServer。而 ctx.inject 是
+  // **动态作用域**：它不会等一个缺席的服务，而是在访问时直接抛
+  // `cannot get property webServer without inject`。
+  //
+  // 所以在没有 webServer 的宿主上（桌面端就是），这条面板通道**挂不起来**。
+  // 这跟捎话桌面端在不在毫无关系 —— 面板却显示成「未检测到捎话桌面端」，那是在骗人。
+  const hostHasWebServer = ctx.get('webServer') !== undefined
+  ctx.inject(['connection'], (webCtx: Context) => {
     // ## 为什么要把这条 inject 的结果记下来（2026-10-15 真机抓到）
     //
     // 回调里的任何一步抛异常都会被 cordis 记成一条 warn，而**宿主不落盘那些行** ——
     // 于是「通道没挂上」在外部完全不可见：浏览器那条请求永远 pending、卡片永远停在
     // 「检查中…」。所以这里把成功与失败**都**记成一个可被诊断工具读到的字符串：
     // `rpcMounted` = 'ok' / '抛了：<原因>'。
+    if (!hostHasWebServer) {
+      // 不抛、不刷异常：这是**宿主能力缺失**，不是故障。面板据此显示真实原因。
+      rpcMounted = 'unavailable: host has no webServer'
+      return
+    }
     try {
       registerTidingsRpc(webCtx, store)
       rpcMounted = 'ok'
     } catch (error) {
       rpcMounted = `failed: ${messageOf(error)}`
+      // 只留一句话常常不够 —— 2026-10-23 那次就是这样：消息说 webServer 缺失，
+      // 而插件源码里已经没有任何 webServer 访问，看不出到底是谁在要它。
+      // 把栈的前几帧一起留住，让诊断工具直接读到**出错位置**，不必靠人猜是哪一层。
+      rpcErrorStack = error instanceof Error && typeof error.stack === 'string'
+        ? error.stack.split('\n').slice(0, 6).join(' | ')
+        : ''
     }
   })
 
@@ -633,6 +671,8 @@ export function apply(ctx: Context, config: Config = {}): void {
         pageTotal,
         // 通道挂载点见 rpcMounted 的 KDoc；不是 'ok' = 设置页会永远停在「检查中…」。
         rpcMounted,
+        // 只有挂载失败时才有值：单看一句话分不清是谁在要那个服务，栈能直接指出位置。
+        ...rpcErrorStack === '' ? {} : { rpcErrorStack },
         // 见 tidingsRpcCalls 的 KDoc：0 = 请求根本没进处理器（路由问题），>0 = 进了但没回。
         tidingsRpcCalls,
         // 为什么最近一次失败要报出来：`send()` 把异常吞进 logger.warn，而宿主不落盘那些行 ——

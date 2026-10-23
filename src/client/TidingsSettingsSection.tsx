@@ -77,6 +77,69 @@ export type TidingsSettingsSectionProps =
  */
 const REPO_URL = 'https://github.com/kexuejin/tidings'
 
+/** 控制面的默认地址；`saveConfig` 里存的就是它，探活也用它兜底。 */
+const DEFAULT_BASE_URL = 'http://127.0.0.1:8788'
+
+/**
+ * 直接问控制面「你在不在」，**不经 DSH 的插件 RPC**。
+ *
+ * ## 为什么需要这条兜底
+ *
+ * 面板 RPC 在框架内部要注册一条 HTTP 前缀路由（`dsh-client-connection` 的 `register`），
+ * 因此需要宿主提供 `webServer`。桌面端宿主不提供它 ⇒ 通道挂不起来 ⇒ 卡片读不到状态，
+ * 而桌面端其实跑得好好的（8788 在监听、`/healthz` 返回 ok）。那时卡片显示
+ * 「未检测到捎话桌面端」，把「我读不到」说成了「它不在」。
+ *
+ * 而卡片本身跑在**浏览器**里、和 8788 在同一台机器上：只要控制面回一个允许的 Origin，
+ * 它就能自己读到状态，根本不需要那条通道。控制面已对 `/healthz` 开放回环来源的 CORS。
+ *
+ * 只读 `/healthz`（节点名与邻居数），不碰 `/v1/` —— 那条路要令牌，也不该被网页读到。
+ */
+async function probeControlPlane(baseUrl: string): Promise<{ view?: StatusSnapshot; reason: string }> {
+  // 两个写法都试：`127.0.0.1` 与 `localhost` 在个别宿主上解析/策略不同，
+  // 而「哪个都不通」与「某一个不通」是不同的结论 —— 失败原因里带上具体 URL，
+  // 界面就能显示到底是在跟谁说话。
+  const base = baseUrl.replace(/\/+$/, '')
+  const candidates = base.includes('localhost') ? [base] : [base, base.replace('127.0.0.1', 'localhost')]
+  const failures: string[] = []
+  for (const candidate of candidates) {
+    const result = await probeOne(candidate)
+    if (result.view !== undefined) return result
+    failures.push(result.reason)
+  }
+  return { reason: failures.join('；') }
+}
+
+async function probeOne(baseUrl: string): Promise<{ view?: StatusSnapshot; reason: string }> {
+  const target = `${baseUrl}/healthz`
+  try {
+    const response = await fetch(target, {
+      headers: { accept: 'application/json' },
+      cache: 'no-store',
+    })
+    if (!response.ok) return { reason: `${target} → HTTP ${String(response.status)}` }
+    const body: unknown = await response.json()
+    if (typeof body !== 'object' || body === null) return { reason: `${target} → 响应不是 JSON 对象` }
+    const view = body as { ok?: unknown; nick?: unknown; online?: unknown }
+    if (view.ok !== true) return { reason: `${target} → ok 不为 true` }
+    return {
+      view: {
+        kind: 'ready',
+        state: 'online',
+        ...typeof view.nick === 'string' ? { nick: view.nick } : {},
+        ...typeof view.online === 'number' ? { online: view.online } : {},
+        config: {},
+      },
+      reason: '',
+    }
+  } catch (error) {
+    // 「探不到」有好几种完全不同的原因（桌面端没起 / 被 CORS 拒 / 页面来源不是回环 /
+    // 被 CSP 拦）。把它们压成一句「未检测到」，正是这个缺陷最初的样子 ——
+    // 所以把原因**带出来**，界面能显示它，人就不用靠猜。
+    return { reason: `${target} → ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}` }
+  }
+}
+
 /** One settings page: explanation, state, and (when it matters) a way to get the host. */
 export function TidingsSettingsSection({ t, port, close }: TidingsSettingsSectionProps): ReactNode {
   const [status, setStatus] = useState<StatusSnapshot>({ kind: 'loading' })
@@ -102,8 +165,18 @@ export function TidingsSettingsSection({ t, port, close }: TidingsSettingsSectio
       // 这里既不落状态也不报错 ⇒ 卡片永远停在「检查中…」，按钮永远禁用，
       // **而屏幕上没有一句话说为什么**。用户看到的是一张死卡片。
       //
-      // 落到 `failed`：界面会走「未检测到捎话桌面端」那一档，那句文案给出原因与出路（真链接）。
-      setStatus({ kind: 'failed' })
+      // ## 先别认输：直接问一次控制面（2026-10-23 抓到）
+      //
+      // 走到这个 catch 有两种完全不同的原因：
+      //   ① 桌面端真的没起 —— 那时确实该报「未检测到」；
+      //   ② **面板通道挂不起来**（桌面端宿主没有 webServer），而桌面端好好地在跑。
+      // 原先把两者都写成「未检测到捎话桌面端」，把宿主限制说成了用户的错。
+      //
+      // 所以先直连 `/healthz`：能读到就把状态显示对，读不到才落到失败态。
+      const probed = await probeControlPlane(baseUrl === '' ? DEFAULT_BASE_URL : baseUrl)
+      // 通道挂了 + 直连也探不到 ⇒ 这是**宿主限制**，不是用户没开桌面端。
+      // 两者的出路完全不同，所以状态就分开存，不要压成一个 failed。
+      setStatus(probed.view ?? { kind: 'channelDown', reason: probed.reason })
     } finally {
       setBusy(false)
     }
@@ -125,7 +198,9 @@ export function TidingsSettingsSection({ t, port, close }: TidingsSettingsSectio
     }
   }, [port, refresh, t])
 
-  const state = status.kind === 'ready' ? status.state : status.kind === 'loading' ? 'loading' : 'unreachable'
+  const state = status.kind === 'ready'
+    ? status.state
+    : status.kind === 'loading' ? 'loading' : status.kind === 'channelDown' ? 'error' : 'unreachable'
   const connected = state === 'online'
 
   return (
@@ -148,12 +223,24 @@ export function TidingsSettingsSection({ t, port, close }: TidingsSettingsSectio
            * 光写「请启动桌面端」对没装的人等于没有出路 —— 所以这里给一个可点的入口。
            */
           <div className={css.hint}>
-            <p style={{ margin: 0 }}>{t('settings.notRunningWhy')}</p>
-            <div className={css.guideActions}>
-              <a className={css.link} href={REPO_URL} target="_blank" rel="noreferrer">
-                {t('settings.getDesktop')}
-              </a>
-            </div>
+            {status.kind === 'channelDown'
+              ? (
+                  <>
+                    <p style={{ margin: 0 }}>{t('settings.channelDownWhy')}</p>
+                    <p className={css.notice}>{t('settings.channelDownHow')}</p>
+                    {status.reason === '' ? null : <p className={css.notice}>{status.reason}</p>}
+                  </>
+                )
+              : (
+                  <>
+                    <p style={{ margin: 0 }}>{t('settings.notRunningWhy')}</p>
+                    <div className={css.guideActions}>
+                      <a className={css.link} href={REPO_URL} target="_blank" rel="noreferrer">
+                        {t('settings.getDesktop')}
+                      </a>
+                    </div>
+                  </>
+                )}
           </div>
         )}
 
@@ -207,6 +294,9 @@ export function TidingsSettingsSection({ t, port, close }: TidingsSettingsSectio
 type StatusSnapshot =
   | { readonly kind: 'loading' }
   | { readonly kind: 'ready'; readonly state: string; readonly nick?: string; readonly online?: number; readonly config: TidingsConfigPatch }
+  /** 面板通道没挂上（宿主限制），且直连控制面也没探到 —— 与「桌面端没运行」是两件事。 */
+  | { readonly kind: 'channelDown'; readonly reason: string }
+  /** 桌面端确实没运行（探活明确拒绝/不可达，且没有更具体的原因）。 */
   | { readonly kind: 'failed' }
 
 function readStatus(result: TidingsRpcResult<unknown>): StatusSnapshot {
@@ -236,5 +326,8 @@ function stateLabel(state: string, status: StatusSnapshot, t: TranslateNS<'tidin
   }
   if (state === 'loading') return t('settings.stateLoading')
   if (state === 'unauthorized') return t('settings.stateUnauthorized')
+  // `error` 是「注解到了但读不出来」（通道/协议层），`unreachable` 才是「桌面端没在跑」。
+  // 两者混成一句会把宿主限制说成用户的错 —— 2026-10-23 就是这么误导的。
+  if (state === 'error') return t('settings.stateChannelDown')
   return t('settings.stateUnreachable')
 }

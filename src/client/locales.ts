@@ -32,6 +32,24 @@ export const zh = {
   'settings.stateLoading': '检查中…',
   'settings.stateUnreachable': '未检测到捎话桌面端',
   'settings.stateUnauthorized': '需要访问令牌',
+  /**
+   * 面板通道没挂上（网关/宿主层的问题），与「桌面端没运行」是**两件事**。
+   *
+   * 2026-10-23 实测：桌面端宿主没有 `webServer` 服务，而 DSH 的面板 RPC 内部要注册一条
+   * HTTP 前缀路由、必须拿到它 —— 于是通道挂不起来。此前这种情况被合并进
+   * 「未检测到捎话桌面端」，把宿主限制说成了用户的错，而桌面端其实跑得好好的。
+   */
+  'settings.stateChannelDown': '读不到状态：本机 DSH 宿主没有提供面板通道（webServer）',
+  /**
+   * 通道挂了时的「原因」与「出路」。
+   *
+   * 说清两件事：① 这不是你的桌面端没开；② 想确认连接，去点菜单栏的托盘图标。
+   *
+   * 不给 tidings 协议链接 —— DSH 桌面端的 will-navigate 会拦掉非 http 协议，
+   * 用户点下去没有任何反应，那比不给按钮更糟。
+   */
+  'settings.channelDownWhy': '本机 DSH 宿主不提供面板通道，界面读不到控制面的状态 —— 这与捎话桌面端在不在无关。',
+  'settings.channelDownHow': '想确认连接：点屏幕顶部菜单栏的「捎话」托盘图标，桌面端自己会显示链路状态。',
   /** 未连接时：为什么（原因），紧接着给去哪拿（动作）。两句缺一不可。 */
   'settings.notRunningWhy': '这台电脑上的 DSH 会话现在到不了手机：捎话桌面端是承载该能力的常驻节点，它没有在运行。',
   'settings.getDesktop': '前往 GitHub 获取捎话桌面端 ↗',
@@ -60,6 +78,9 @@ export const en: Record<TidingsKey, string> = {
   'settings.stateLoading': 'Checking…',
   'settings.stateUnreachable': 'Tidings desktop app not detected',
   'settings.stateUnauthorized': 'Access token required',
+  'settings.stateChannelDown': 'Status unavailable: this DSH host provides no panel channel (webServer)',
+  'settings.channelDownWhy': 'This DSH host provides no panel channel, so the card cannot read the control plane - unrelated to whether the Tidings desktop app is running.',
+  'settings.channelDownHow': 'To confirm the link: click the Tidings tray icon in the menu bar; the desktop app shows link state itself.',
   'settings.notRunningWhy': 'DSH sessions on this machine cannot reach your phone right now: the Tidings desktop app is the resident node that carries them, and it is not running.',
   'settings.getDesktop': 'Get the Tidings desktop app on GitHub ↗',
   'settings.advanced': 'Advanced',
