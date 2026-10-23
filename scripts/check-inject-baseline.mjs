@@ -38,6 +38,32 @@ const names = m[1].split(',').map(s => s.trim().replace(/['\"]/g, '')).filter(s 
 const problems = names.filter(n => !BASELINE.has(n)).map(n =>
   'inject 声明了 ' + n + ' —— 若宿主没提供它，cordis 会拒绝加载整个插件且不报错；请改用 ctx.get() 运行时可选读取')
 
+// ## 同时扫 `ctx.inject([...])` —— 2026-10-23 的漏网之鱼
+//
+// 上面那段只检查**模块级** `export const inject`。而真实故障出在 apply 里的
+// `ctx.inject(['connection', 'webServer'], ...)`：桌面端宿主没有 webServer，
+// 这个 inject 直接抛，`registerTidingsRpc` 一行没执行，面板于是显示
+// 「未检测到捎话桌面端」，而桌面端好好地在 8788 上跑着。
+//
+// 判据与模块级完全一致：**inject 里的每个名字都必须是宿主一定提供的基线服务。**
+// 差别只是它不在文件顶部，而在 apply 里 —— 所以必须单独扫。
+const callInjectPattern = /\.inject\(\s*\[([^\]]*)\]/g
+const callProblems = []
+for (const hit of text.matchAll(callInjectPattern)) {
+  const list = hit[1]
+  const declared = list.split(',').map(s => s.trim().replace(/['"]/g, '')).filter(s => s.length > 0)
+  for (const n of declared) {
+    if (!BASELINE.has(n)) {
+      callProblems.push(
+        'ctx.inject 声明了 ' + n +
+        ' —— 宿主没提供它时这个 inject 会直接抛，回调里的注册一行都不会执行，' +
+        '且症状是静默的（面板空白/永远 pending）。请只注入基线服务，其余用 ctx.get()。')
+    }
+  }
+}
+
+problems.push(...callProblems)
+
 if (problems.length === 0) {
   console.log('inject 门禁通过：只声明基线服务（' + names.join(', ') + '），其余走 ctx.get 可选读取。')
   process.exit(0)
