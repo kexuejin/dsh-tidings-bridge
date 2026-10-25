@@ -4,7 +4,14 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-25
+
 ### Changed
+
+- **包与仓库名随产品更名**：npm 包 `dsh-tidings` → `dsh-tidings`，仓库 `dsh-tidings-bridge` →
+  `dsh-tidings-bridge`，界面文案「捎话 (Tidings)」→「捎话 (Tidings)」。插件只耦合控制面
+  （`127.0.0.1:8788` 回环 HTTP），不探测桌面端的路径/进程/数据目录，桌面端应用更名与
+  目录迁移对插件零影响；旧包 `dsh-tidings` 以 deprecate 指向新名。
 
 - **`user/message` 优先带结构化附件元数据（task-45，cap `att1`）**：`attachment` 是
   `POST /v1/agent/event` 的可选字段，键名与顺序照 core/protocol 的 CodecAgent

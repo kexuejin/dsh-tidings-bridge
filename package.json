@@ -1,6 +1,6 @@
 {
   "name": "dsh-tidings",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "捎话 (Tidings) 局域网消息节点插件：把本机 agentNode 控制面接进 DeepSeek Harness —— agent 工具、设置页集成卡片与会话自动宣告。",
   "license": "MIT",
   "type": "module",
